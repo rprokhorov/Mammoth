@@ -18,6 +18,7 @@ interface ImageDataResult {
 interface FileAttachmentProps {
   fileIds: string[];
   serverId: string;
+  onImageLoad?: () => void;
 }
 
 const IMAGE_EXTENSIONS = ["png", "jpg", "jpeg", "gif", "bmp", "webp", "svg"];
@@ -28,7 +29,7 @@ function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export function FileAttachment({ fileIds, serverId }: FileAttachmentProps) {
+export function FileAttachment({ fileIds, serverId, onImageLoad }: FileAttachmentProps) {
   const [files, setFiles] = useState<FileInfo[]>([]);
   const [imageUrls, setImageUrls] = useState<Record<string, string>>({});
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
@@ -91,24 +92,38 @@ export function FileAttachment({ fileIds, serverId }: FileAttachmentProps) {
           return (
             <div key={file.id} className={`file-attachment ${isImage ? "image" : "generic"}`}>
               {isImage ? (
-                imgUrl ? (
-                  <div className="file-image-preview" onClick={() => setLightboxUrl(imgUrl)} title="Click to enlarge">
-                    <img
-                      src={imgUrl}
-                      alt={file.name}
-                      style={{
-                        maxWidth: Math.min(file.width || 400, 400),
-                        maxHeight: 300,
-                        cursor: "zoom-in",
-                      }}
-                    />
-                  </div>
-                ) : (
-                  <div className="file-image-loading">
-                    <div className="spinner small" />
-                    <span>{file.name}</span>
-                  </div>
-                )
+                (() => {
+                  // Calculate display dimensions capped at 400×300
+                  const origW = file.width || 400;
+                  const origH = file.height || 200;
+                  const scale = Math.min(400 / origW, 300 / origH, 1);
+                  const dispW = Math.round(origW * scale);
+                  const dispH = Math.round(origH * scale);
+                  return imgUrl ? (
+                    <div
+                      className="file-image-preview"
+                      onClick={() => setLightboxUrl(imgUrl)}
+                      title="Click to enlarge"
+                      style={{ width: dispW, height: dispH }}
+                    >
+                      <img
+                        src={imgUrl}
+                        alt={file.name}
+                        style={{ width: dispW, height: dispH, cursor: "zoom-in", display: "block" }}
+                        onLoad={onImageLoad}
+                      />
+                    </div>
+                  ) : (
+                    // Reserve exact space while image loads to prevent layout shifts
+                    <div
+                      className="file-image-loading"
+                      style={{ width: dispW, height: dispH }}
+                    >
+                      <div className="spinner small" />
+                      <span>{file.name}</span>
+                    </div>
+                  );
+                })()
               ) : (
                 <div className="file-generic">
                   <span className="file-icon">📄</span>

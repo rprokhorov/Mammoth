@@ -21,6 +21,7 @@ impl MattermostClient {
             .map_err(|e| AppError::Config(format!("Invalid server URL: {}", e)))?;
 
         let http = Client::builder()
+            .timeout(std::time::Duration::from_secs(10))
             .build()
             .map_err(AppError::Network)?;
 

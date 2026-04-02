@@ -18,6 +18,7 @@ interface MessageItemProps {
   currentUserId: string | null;
   serverId?: string;
   hideThreadIndicator?: boolean;
+  onImageLoad?: () => void;
 }
 
 export const MessageItem = memo(function MessageItem({
@@ -28,6 +29,7 @@ export const MessageItem = memo(function MessageItem({
   currentUserId,
   serverId,
   hideThreadIndicator,
+  onImageLoad,
 }: MessageItemProps) {
   const users = useUiStore((s) => s.users);
   const user = users[post.user_id];
@@ -160,7 +162,7 @@ export const MessageItem = memo(function MessageItem({
 
         {/* File attachments */}
         {post.file_ids && post.file_ids.length > 0 && serverId && (
-          <FileAttachment fileIds={post.file_ids} serverId={serverId} />
+          <FileAttachment fileIds={post.file_ids} serverId={serverId} onImageLoad={onImageLoad} />
         )}
 
         {/* Reactions bar */}

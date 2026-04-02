@@ -41,6 +41,7 @@ export function MessageList({
   const [hasMore, setHasMore] = useState(true);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [isNearBottom, setIsNearBottom] = useState(true);
+  const shouldPinToBottom = useRef(false);
 
   const orderByChannel = useMessagesStore((s) => s.orderByChannel);
   const order = useMemo(() => orderByChannel[channelId] ?? EMPTY_ORDER, [orderByChannel, channelId]);
@@ -64,10 +65,11 @@ export function MessageList({
         if (cancelled) return;
         setChannelPosts(channelId, res.order, res.posts);
         if (res.order.length < POSTS_PER_PAGE) setHasMore(false);
-        // Scroll to bottom on initial load
-        requestAnimationFrame(() => {
-          bottomRef.current?.scrollIntoView();
-        });
+        // Pin to bottom while content (images etc.) is still loading
+        shouldPinToBottom.current = true;
+        bottomRef.current?.scrollIntoView();
+        // Stop pinning after 2s — enough for images to load
+        setTimeout(() => { shouldPinToBottom.current = false; }, 2000);
       })
       .catch((e) => {
         if (!cancelled) console.error("Failed to load posts:", e);
@@ -89,6 +91,19 @@ export function MessageList({
       });
     }
   }, [order.length, isNearBottom]);
+
+  // Keep pinned to bottom while images/content loads after initial channel open
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver(() => {
+      if (shouldPinToBottom.current) {
+        bottomRef.current?.scrollIntoView();
+      }
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   // Load user info for unknown users in posts
   useEffect(() => {
@@ -176,6 +191,16 @@ export function MessageList({
     }
   }, [serverId]);
 
+  const handleImageLoad = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    // If we're within 300px of bottom, snap back down after image expands layout
+    if (distFromBottom < 300) {
+      el.scrollTop = el.scrollHeight;
+    }
+  }, []);
+
   function scrollToBottom() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }
@@ -225,6 +250,7 @@ export function MessageList({
           onDelete={handleDelete}
           currentUserId={currentUserId}
           serverId={serverId}
+          onImageLoad={handleImageLoad}
         />,
       );
 

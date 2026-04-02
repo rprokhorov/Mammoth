@@ -1,5 +1,5 @@
 use serde::Serialize;
-use tauri::{Manager, State};
+use tauri::State;
 
 use crate::errors::AppError;
 use crate::mattermost::types::FileInfo;
@@ -126,8 +126,8 @@ pub async fn save_temp_file(
         .decode(&data_base64)
         .map_err(|e| AppError::Config(format!("Invalid base64: {}", e)))?;
 
-    let tmp_dir = app.path().temp_dir()
-        .map_err(|e| AppError::Config(e.to_string()))?;
+    let _ = app; // AppHandle not needed — use std temp dir
+    let tmp_dir = std::env::temp_dir();
     let tmp_path = tmp_dir.join(&file_name);
     tokio::fs::write(&tmp_path, &bytes).await.map_err(AppError::Io)?;
     Ok(tmp_path.to_string_lossy().to_string())
