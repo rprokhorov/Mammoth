@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { useMessagesStore, type PostData } from "@/stores/messagesStore";
-import { EMOJI_MAP } from "./EmojiPicker";
+import { EMOJI_MAP, EmojiPicker } from "./EmojiPicker";
 
 interface MessageComposerProps {
   channelId: string;
@@ -33,7 +33,9 @@ export function MessageComposer({ channelId, serverId }: MessageComposerProps) {
   const [emojiQuery, setEmojiQuery] = useState<string | null>(null);
   const [emojiResults, setEmojiResults] = useState<string[]>([]);
   const [emojiSelectedIdx, setEmojiSelectedIdx] = useState(0);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const emojiTriggerRef = useRef<HTMLButtonElement>(null);
 
   const editingPostId = useMessagesStore((s) => s.editingPostId);
   const posts = useMessagesStore((s) => s.posts);
@@ -100,6 +102,24 @@ export function MessageComposer({ channelId, serverId }: MessageComposerProps) {
       const newCursor = colonIdx + emojiName.length + 3;
       ta.setSelectionRange(newCursor, newCursor);
       ta.focus();
+    });
+  }
+
+  function insertEmojiFromPicker(emojiName: string) {
+    const ta = textareaRef.current;
+    const unicode = EMOJI_MAP[emojiName] || `:${emojiName}: `;
+    const cursor = ta ? ta.selectionStart : text.length;
+    const before = text.slice(0, cursor);
+    const after = text.slice(cursor);
+    const newText = before + unicode + after;
+    setText(newText);
+    setShowEmojiPicker(false);
+    requestAnimationFrame(() => {
+      if (ta) {
+        const newCursor = cursor + unicode.length;
+        ta.setSelectionRange(newCursor, newCursor);
+        ta.focus();
+      }
     });
   }
 
@@ -371,6 +391,26 @@ export function MessageComposer({ channelId, serverId }: MessageComposerProps) {
           rows={1}
           disabled={sending}
         />
+        <div className="composer-emoji-wrap">
+          <button
+            ref={emojiTriggerRef}
+            className="composer-emoji-btn"
+            onClick={() => setShowEmojiPicker((v) => !v)}
+            title="Emoji"
+            disabled={sending}
+          >
+            😊
+          </button>
+          {showEmojiPicker && (
+            <div className="composer-emoji-popup">
+              <EmojiPicker
+                onSelect={insertEmojiFromPicker}
+                onClose={() => setShowEmojiPicker(false)}
+                triggerRef={emojiTriggerRef}
+              />
+            </div>
+          )}
+        </div>
         <button
           className="composer-send-btn"
           onClick={handleSend}

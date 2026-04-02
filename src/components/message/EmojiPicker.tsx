@@ -3,6 +3,8 @@ import { useState, useRef, useEffect } from "react";
 interface EmojiPickerProps {
   onSelect: (emoji: string) => void;
   onClose: () => void;
+  /** Optional ref to the trigger button — clicks on it won't trigger onClose */
+  triggerRef?: React.RefObject<HTMLElement | null>;
 }
 
 const EMOJI_CATEGORIES: Record<string, string[]> = {
@@ -64,14 +66,16 @@ export function emojiNameToUnicode(name: string): string {
   return EMOJI_MAP[name] || `:${name}:`;
 }
 
-export function EmojiPicker({ onSelect, onClose }: EmojiPickerProps) {
+export function EmojiPicker({ onSelect, onClose, triggerRef }: EmojiPickerProps) {
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState("Smileys");
   const pickerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
-      if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      if (triggerRef?.current?.contains(target)) return;
+      if (pickerRef.current && !pickerRef.current.contains(target)) {
         onClose();
       }
     }
@@ -84,7 +88,7 @@ export function EmojiPicker({ onSelect, onClose }: EmojiPickerProps) {
       document.removeEventListener("mousedown", handleClickOutside);
       document.removeEventListener("keydown", handleEscape);
     };
-  }, [onClose]);
+  }, [onClose, triggerRef]);
 
   const filteredEmojis = search
     ? Object.values(EMOJI_CATEGORIES)

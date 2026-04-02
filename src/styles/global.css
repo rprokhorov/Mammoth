@@ -1167,6 +1167,39 @@ button.secondary:hover:not(:disabled) {
   cursor: not-allowed;
 }
 
+.composer-emoji-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.composer-emoji-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-secondary);
+  font-size: 18px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+.composer-emoji-btn:hover:not(:disabled) {
+  background: var(--bg-hover);
+}
+.composer-emoji-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.composer-emoji-popup {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  right: 0;
+  z-index: 200;
+}
+
 /* Attachment preview strip */
 .composer-attachments {
   display: flex;

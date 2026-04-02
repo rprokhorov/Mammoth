@@ -4,6 +4,7 @@ import { useThreadsStore } from "@/stores/threadsStore";
 import { useMessagesStore, type PostData } from "@/stores/messagesStore";
 import { useUiStore } from "@/stores/uiStore";
 import { MessageItem } from "./MessageItem";
+import { EmojiPicker, EMOJI_MAP } from "./EmojiPicker";
 
 interface PostsResponse {
   order: string[];
@@ -30,7 +31,9 @@ export function ThreadPanel({ serverId, currentUserId }: ThreadPanelProps) {
 
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const emojiTriggerRef = useRef<HTMLButtonElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   // Load thread when activeThreadId changes and mark as read
@@ -132,6 +135,24 @@ export function ThreadPanel({ serverId, currentUserId }: ThreadPanelProps) {
     } finally {
       setSending(false);
     }
+  }
+
+  function insertEmojiFromPicker(emojiName: string) {
+    const ta = textareaRef.current;
+    const unicode = EMOJI_MAP[emojiName] || `:${emojiName}: `;
+    const cursor = ta ? ta.selectionStart : text.length;
+    const before = text.slice(0, cursor);
+    const after = text.slice(cursor);
+    const newText = before + unicode + after;
+    handleTextChange(newText);
+    setShowEmojiPicker(false);
+    requestAnimationFrame(() => {
+      if (ta) {
+        const newCursor = cursor + unicode.length;
+        ta.setSelectionRange(newCursor, newCursor);
+        ta.focus();
+      }
+    });
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
@@ -237,6 +258,26 @@ export function ThreadPanel({ serverId, currentUserId }: ThreadPanelProps) {
             rows={1}
             disabled={sending}
           />
+          <div className="composer-emoji-wrap">
+            <button
+              ref={emojiTriggerRef}
+              className="composer-emoji-btn"
+              onClick={() => setShowEmojiPicker((v) => !v)}
+              title="Emoji"
+              disabled={sending}
+            >
+              😊
+            </button>
+            {showEmojiPicker && (
+              <div className="composer-emoji-popup">
+                <EmojiPicker
+                  onSelect={insertEmojiFromPicker}
+                  onClose={() => setShowEmojiPicker(false)}
+                  triggerRef={emojiTriggerRef}
+                />
+              </div>
+            )}
+          </div>
           <button
             className="composer-send-btn"
             onClick={handleSend}
