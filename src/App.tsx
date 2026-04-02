@@ -1,4 +1,4 @@
-import { useEffect, useState, Component, type ReactNode, lazy, Suspense } from "react";
+import { useEffect, useState, useRef, useCallback, Component, type ReactNode, lazy, Suspense } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useUiStore, type SidebarCategory } from "@/stores/uiStore";
 import { useMessagesStore } from "@/stores/messagesStore";
@@ -81,6 +81,37 @@ function AppContent() {
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showShortcutsModal, setShowShortcutsModal] = useState(false);
   const [showCreateChannel, setShowCreateChannel] = useState(false);
+
+  // Resizable panel widths
+  const [sidebarWidth, setSidebarWidth] = useState(240);
+  const [threadWidth, setThreadWidth] = useState(400);
+  const dragging = useRef<{ type: "sidebar" | "thread"; startX: number; startW: number } | null>(null);
+
+  const handleResizeMouseDown = useCallback((type: "sidebar" | "thread", e: React.MouseEvent) => {
+    e.preventDefault();
+    dragging.current = {
+      type,
+      startX: e.clientX,
+      startW: type === "sidebar" ? sidebarWidth : threadWidth,
+    };
+
+    function onMove(ev: MouseEvent) {
+      if (!dragging.current) return;
+      const delta = ev.clientX - dragging.current.startX;
+      if (dragging.current.type === "sidebar") {
+        setSidebarWidth(Math.max(160, Math.min(480, dragging.current.startW + delta)));
+      } else {
+        setThreadWidth(Math.max(240, Math.min(640, dragging.current.startW - delta)));
+      }
+    }
+    function onUp() {
+      dragging.current = null;
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    }
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  }, [sidebarWidth, threadWidth]);
 
   useWebSocket();
 
@@ -460,7 +491,7 @@ function AppContent() {
             {activeServerId && activeTeamId && (
               <SearchBar serverId={activeServerId} teamId={activeTeamId} />
             )}
-            <div className="channel-sidebar">
+            <div className="channel-sidebar" style={{ width: sidebarWidth, minWidth: sidebarWidth }}>
               <ChannelList
                 onSelectChannel={handleSelectChannel}
                 onCreateChannel={() => setShowCreateChannel(true)}
@@ -468,6 +499,7 @@ function AppContent() {
                 currentUserId={currentUserId}
               />
             </div>
+            <div className="resize-handle" onMouseDown={(e) => handleResizeMouseDown("sidebar", e)} />
             <div className="main-panel">
               <Header
                 onTeamChange={handleTeamChange}
@@ -505,10 +537,14 @@ function AppContent() {
               </div>
             </div>
             {activeThreadId && activeServerId && (
-              <ThreadPanel
-                serverId={activeServerId}
-                currentUserId={currentUserId}
-              />
+              <>
+                <div className="resize-handle" onMouseDown={(e) => handleResizeMouseDown("thread", e)} />
+                <ThreadPanel
+                  serverId={activeServerId}
+                  currentUserId={currentUserId}
+                  width={threadWidth}
+                />
+              </>
             )}
           </div>
         )}

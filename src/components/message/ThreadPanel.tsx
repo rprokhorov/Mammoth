@@ -14,11 +14,12 @@ interface PostsResponse {
 interface ThreadPanelProps {
   serverId: string;
   currentUserId: string | null;
+  width?: number;
 }
 
 const EMPTY_ORDER: string[] = [];
 
-export function ThreadPanel({ serverId, currentUserId }: ThreadPanelProps) {
+export function ThreadPanel({ serverId, currentUserId, width }: ThreadPanelProps) {
   const activeThreadId = useThreadsStore((s) => s.activeThreadId);
   const threadOrderMap = useThreadsStore((s) => s.threadOrder);
   const threadPosts = useThreadsStore((s) => s.threadPosts);
@@ -185,7 +186,7 @@ export function ThreadPanel({ serverId, currentUserId }: ThreadPanelProps) {
   const replyCount = order.filter((id) => id !== activeThreadId).length;
 
   return (
-    <div className="thread-panel">
+    <div className="thread-panel" style={width ? { width, minWidth: width } : undefined}>
       <div className="thread-panel-header">
         <div className="thread-panel-title">
           <span className="thread-title-text">Thread</span>

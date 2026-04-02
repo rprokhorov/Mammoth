@@ -11,12 +11,30 @@
   --success: #a6e3a1;
   --error: #f38ba8;
   --sidebar-width: 64px;
+  color-scheme: dark;
 }
 
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+  scrollbar-width: thin;
+  scrollbar-color: #45475a #1e1e2e;
+}
+
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+*::-webkit-scrollbar-track {
+  background: #1e1e2e;
+}
+*::-webkit-scrollbar-thumb {
+  background: #45475a;
+  border-radius: 3px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: #6c7086;
 }
 
 body {
@@ -40,7 +58,9 @@ body {
 
 .app-content {
   flex: 1;
-  overflow: auto;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .app-loading {
@@ -275,9 +295,22 @@ button.secondary:hover:not(:disabled) {
 .channel-sidebar {
   width: 240px;
   background: var(--bg-secondary);
-  border-right: 1px solid var(--border);
   overflow-y: auto;
   flex-shrink: 0;
+}
+
+.resize-handle {
+  width: 4px;
+  flex-shrink: 0;
+  background: var(--border);
+  cursor: col-resize;
+  transition: background 0.15s;
+  position: relative;
+  z-index: 10;
+}
+.resize-handle:hover,
+.resize-handle:active {
+  background: var(--accent);
 }
 
 .main-panel {
@@ -1303,11 +1336,12 @@ button.secondary:hover:not(:disabled) {
 /* Thread Panel */
 .thread-panel {
   width: 400px;
-  border-left: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
   background: var(--bg-primary);
+  min-width: 0;
+  overflow: hidden;
 }
 
 .thread-panel-header {
@@ -1353,7 +1387,9 @@ button.secondary:hover:not(:disabled) {
 .thread-panel-body {
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 8px 0;
+  min-width: 0;
 }
 
 .thread-loading {
