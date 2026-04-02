@@ -330,6 +330,7 @@ impl MattermostClient {
         channel_id: &str,
         message: &str,
         root_id: Option<&str>,
+        file_ids: Option<&[String]>,
     ) -> Result<Post, AppError> {
         let auth = self.auth_header()?;
         let mut body = serde_json::json!({
@@ -338,6 +339,11 @@ impl MattermostClient {
         });
         if let Some(rid) = root_id {
             body["root_id"] = serde_json::json!(rid);
+        }
+        if let Some(ids) = file_ids {
+            if !ids.is_empty() {
+                body["file_ids"] = serde_json::json!(ids);
+            }
         }
 
         let resp = self

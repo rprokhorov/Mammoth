@@ -114,6 +114,8 @@ pub fn run() {
             commands::get_file_info,
             commands::get_file_url,
             commands::get_image_data,
+            commands::read_local_file_as_data_url,
+            commands::save_temp_file,
             commands::download_file,
             // Search
             commands::search_posts,

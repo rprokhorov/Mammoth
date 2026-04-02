@@ -1,5 +1,5 @@
 use serde::Serialize;
-use tauri::State;
+use tauri::{Manager, State};
 
 use crate::errors::AppError;
 use crate::mattermost::types::FileInfo;
@@ -97,6 +97,40 @@ pub async fn get_image_data(
     let encoded = base64::engine::general_purpose::STANDARD.encode(&bytes);
     let data_url = format!("data:{};base64,{}", mime_type, encoded);
     Ok(ImageDataResult { data_url })
+}
+
+/// Reads a local file and returns it as a base64 data URL.
+/// Used for preview of locally-attached files before upload, and for clipboard images.
+#[tauri::command]
+pub async fn read_local_file_as_data_url(
+    file_path: String,
+    mime_type: String,
+) -> Result<ImageDataResult, AppError> {
+    let bytes = tokio::fs::read(&file_path).await.map_err(AppError::Io)?;
+    use base64::Engine;
+    let encoded = base64::engine::general_purpose::STANDARD.encode(&bytes);
+    let data_url = format!("data:{};base64,{}", mime_type, encoded);
+    Ok(ImageDataResult { data_url })
+}
+
+/// Saves raw bytes (base64-encoded) to a temp file and returns the path.
+/// Used to persist clipboard image data so it can be uploaded via upload_file.
+#[tauri::command]
+pub async fn save_temp_file(
+    app: tauri::AppHandle,
+    file_name: String,
+    data_base64: String,
+) -> Result<String, AppError> {
+    use base64::Engine;
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(&data_base64)
+        .map_err(|e| AppError::Config(format!("Invalid base64: {}", e)))?;
+
+    let tmp_dir = app.path().temp_dir()
+        .map_err(|e| AppError::Config(e.to_string()))?;
+    let tmp_path = tmp_dir.join(&file_name);
+    tokio::fs::write(&tmp_path, &bytes).await.map_err(AppError::Io)?;
+    Ok(tmp_path.to_string_lossy().to_string())
 }
 
 #[tauri::command]

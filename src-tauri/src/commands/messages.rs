@@ -44,6 +44,7 @@ pub async fn send_post(
     channel_id: String,
     message: String,
     root_id: Option<String>,
+    file_ids: Option<Vec<String>>,
 ) -> Result<Post, AppError> {
     let client = {
         let servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
@@ -54,7 +55,7 @@ pub async fn send_post(
     };
 
     client
-        .create_post(&channel_id, &message, root_id.as_deref())
+        .create_post(&channel_id, &message, root_id.as_deref(), file_ids.as_deref())
         .await
 }
 
