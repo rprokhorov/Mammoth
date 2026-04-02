@@ -1165,6 +1165,111 @@ impl MattermostClient {
         Ok(())
     }
 
+    // --- Sidebar Categories ---
+
+    pub async fn get_sidebar_categories(
+        &self,
+        user_id: &str,
+        team_id: &str,
+    ) -> Result<Vec<SidebarCategory>, AppError> {
+        let resp = self
+            .get_authenticated(&format!(
+                "/users/{}/teams/{}/channels/categories",
+                user_id, team_id
+            ))
+            .await?;
+        // API returns { "order": [...], "categories": [...] }
+        let body: serde_json::Value = resp.json().await?;
+        let categories: Vec<SidebarCategory> = serde_json::from_value(
+            body.get("categories")
+                .cloned()
+                .unwrap_or(serde_json::Value::Array(vec![]))
+        ).map_err(|e| AppError::Config(format!("Failed to parse sidebar categories: {}", e)))?;
+        Ok(categories)
+    }
+
+    pub async fn create_sidebar_category(
+        &self,
+        user_id: &str,
+        team_id: &str,
+        category: &SidebarCategoryCreate,
+    ) -> Result<SidebarCategory, AppError> {
+        let auth = self.auth_header()?;
+        let resp = self
+            .http
+            .post(self.api_url(&format!(
+                "/users/{}/teams/{}/channels/categories",
+                user_id, team_id
+            )))
+            .header(header::AUTHORIZATION, &auth)
+            .json(category)
+            .send()
+            .await?;
+
+        if !resp.status().is_success() {
+            let status = resp.status().as_u16();
+            let msg = resp.text().await.unwrap_or_default();
+            return Err(AppError::Api { status, message: msg });
+        }
+
+        let created: SidebarCategory = resp.json().await?;
+        Ok(created)
+    }
+
+    pub async fn update_sidebar_category(
+        &self,
+        user_id: &str,
+        team_id: &str,
+        category_id: &str,
+        category: &SidebarCategoryUpdate,
+    ) -> Result<SidebarCategory, AppError> {
+        let auth = self.auth_header()?;
+        let resp = self
+            .http
+            .put(self.api_url(&format!(
+                "/users/{}/teams/{}/channels/categories/{}",
+                user_id, team_id, category_id
+            )))
+            .header(header::AUTHORIZATION, &auth)
+            .json(category)
+            .send()
+            .await?;
+
+        if !resp.status().is_success() {
+            let status = resp.status().as_u16();
+            let msg = resp.text().await.unwrap_or_default();
+            return Err(AppError::Api { status, message: msg });
+        }
+
+        let updated: SidebarCategory = resp.json().await?;
+        Ok(updated)
+    }
+
+    pub async fn delete_sidebar_category(
+        &self,
+        user_id: &str,
+        team_id: &str,
+        category_id: &str,
+    ) -> Result<(), AppError> {
+        let auth = self.auth_header()?;
+        let resp = self
+            .http
+            .delete(self.api_url(&format!(
+                "/users/{}/teams/{}/channels/categories/{}",
+                user_id, team_id, category_id
+            )))
+            .header(header::AUTHORIZATION, &auth)
+            .send()
+            .await?;
+
+        if !resp.status().is_success() {
+            let status = resp.status().as_u16();
+            let msg = resp.text().await.unwrap_or_default();
+            return Err(AppError::Api { status, message: msg });
+        }
+        Ok(())
+    }
+
     /// Get WebSocket URL for this server
     pub fn websocket_url(&self) -> Result<String, AppError> {
         let base = self.base_url.as_str();

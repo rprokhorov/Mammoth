@@ -145,6 +145,11 @@ pub fn run() {
             commands::update_channel_notify_props,
             commands::get_favorite_channels,
             commands::toggle_favorite_channel,
+            // Sidebar Categories
+            commands::get_sidebar_categories,
+            commands::create_sidebar_category,
+            commands::update_sidebar_category,
+            commands::delete_sidebar_category,
             // Tray / Badge
             set_badge_count,
         ])

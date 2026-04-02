@@ -8,6 +8,7 @@ pub mod profile;
 pub mod reactions;
 pub mod search;
 pub mod servers;
+pub mod sidebar;
 pub mod teams;
 pub mod threads;
 
@@ -21,5 +22,6 @@ pub use profile::*;
 pub use reactions::*;
 pub use search::*;
 pub use servers::*;
+pub use sidebar::*;
 pub use teams::*;
 pub use threads::*;

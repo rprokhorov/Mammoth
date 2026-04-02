@@ -229,3 +229,50 @@ pub struct UserStatus {
     #[serde(default)]
     pub last_activity_at: i64,
 }
+
+// --- Sidebar Categories ---
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SidebarCategory {
+    pub id: String,
+    pub user_id: String,
+    pub team_id: String,
+    pub sort_order: i64,
+    pub sorting: String,
+    #[serde(rename = "type")]
+    pub category_type: String,
+    pub display_name: String,
+    #[serde(default)]
+    pub muted: bool,
+    #[serde(default)]
+    pub collapsed: bool,
+    #[serde(default)]
+    pub channel_ids: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SidebarCategoryCreate {
+    pub team_id: String,
+    pub user_id: String,
+    pub display_name: String,
+    pub channel_ids: Vec<String>,
+    pub sort_order: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SidebarCategoryUpdate {
+    pub id: String,
+    pub user_id: String,
+    pub team_id: String,
+    pub display_name: String,
+    pub channel_ids: Vec<String>,
+    pub sort_order: i64,
+    #[serde(rename = "type")]
+    pub category_type: String,
+    #[serde(default)]
+    pub sorting: String,
+    #[serde(default)]
+    pub muted: bool,
+    #[serde(default)]
+    pub collapsed: bool,
+}

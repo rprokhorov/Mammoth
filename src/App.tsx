@@ -1,6 +1,6 @@
 import { useEffect, useState, Component, type ReactNode, lazy, Suspense } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { useUiStore } from "@/stores/uiStore";
+import { useUiStore, type SidebarCategory } from "@/stores/uiStore";
 import { useMessagesStore } from "@/stores/messagesStore";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { ServerSidebar } from "@/components/layout/ServerSidebar";
@@ -338,6 +338,14 @@ function AppContent() {
         // favorites not critical
       }
 
+      // Load sidebar categories
+      try {
+        const categories = await invoke<SidebarCategory[]>("get_sidebar_categories", { serverId, teamId });
+        useUiStore.getState().setSidebarCategories(categories);
+      } catch {
+        // sidebar categories not critical
+      }
+
       // Select first public channel by default and set it as the default tab
       const firstPublic = channelData.find((ch) => ch.channel_type === "O");
       if (firstPublic) {
@@ -376,6 +384,7 @@ function AppContent() {
     const store = useUiStore.getState();
     store.setActiveTeamId(teamId);
     store.setActiveChannelId(null);
+    store.setSidebarCategories([]);
     const serverId = store.activeServerId;
     if (serverId) {
       await loadChannels(serverId, teamId);

@@ -38,6 +38,19 @@ export interface UserInfo {
   email: string;
 }
 
+export interface SidebarCategory {
+  id: string;
+  user_id: string;
+  team_id: string;
+  sort_order: number;
+  sorting: string;
+  category_type: string; // "favorites" | "channels" | "direct_messages" | "custom"
+  display_name: string;
+  muted: boolean;
+  collapsed: boolean;
+  channel_ids: string[];
+}
+
 interface UiState {
   // Servers
   servers: Server[];
@@ -64,6 +77,9 @@ interface UiState {
 
   // Favorites
   favoriteChannels: Set<string>;
+
+  // Sidebar Categories
+  sidebarCategories: SidebarCategory[];
 
   // WS status
   wsStatus: string;
@@ -103,6 +119,12 @@ interface UiState {
   setFavoriteChannels: (ids: string[]) => void;
   toggleFavorite: (channelId: string) => void;
 
+  // Sidebar Category actions
+  setSidebarCategories: (categories: SidebarCategory[]) => void;
+  updateSidebarCategory: (category: SidebarCategory) => void;
+  addSidebarCategory: (category: SidebarCategory) => void;
+  removeSidebarCategory: (categoryId: string) => void;
+
   // WS
   setWsStatus: (status: string) => void;
 }
@@ -122,6 +144,7 @@ export const useUiStore = create<UiState>((set) => ({
   typingUsers: {},
   mainSubView: "channels",
   favoriteChannels: new Set<string>(),
+  sidebarCategories: [],
   wsStatus: "disconnected",
 
   setServers: (servers) => set({ servers }),
@@ -202,5 +225,20 @@ export const useUiStore = create<UiState>((set) => ({
       }
       return { favoriteChannels: next };
     }),
+  setSidebarCategories: (categories) => set({ sidebarCategories: categories }),
+  updateSidebarCategory: (category) =>
+    set((state) => ({
+      sidebarCategories: state.sidebarCategories.map((c) =>
+        c.id === category.id ? category : c,
+      ),
+    })),
+  addSidebarCategory: (category) =>
+    set((state) => ({
+      sidebarCategories: [...state.sidebarCategories, category],
+    })),
+  removeSidebarCategory: (categoryId) =>
+    set((state) => ({
+      sidebarCategories: state.sidebarCategories.filter((c) => c.id !== categoryId),
+    })),
   setWsStatus: (status) => set({ wsStatus: status }),
 }));
