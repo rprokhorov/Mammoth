@@ -1760,6 +1760,14 @@ button.secondary:hover:not(:disabled) {
   background: rgba(255, 255, 255, 0.3);
 }
 
+.lightbox-spinner {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
 .file-generic {
   display: flex;
   align-items: center;

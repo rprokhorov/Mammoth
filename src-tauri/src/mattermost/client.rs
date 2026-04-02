@@ -486,6 +486,25 @@ impl MattermostClient {
         self.api_url(&format!("/files/{}/thumbnail", file_id))
     }
 
+    pub async fn download_thumbnail(&self, file_id: &str) -> Result<Vec<u8>, AppError> {
+        let auth = self.auth_header()?;
+        let resp = self
+            .http
+            .get(self.api_url(&format!("/files/{}/thumbnail", file_id)))
+            .header(header::AUTHORIZATION, &auth)
+            .send()
+            .await?;
+
+        if !resp.status().is_success() {
+            let status = resp.status().as_u16();
+            let msg = resp.text().await.unwrap_or_default();
+            return Err(AppError::Api { status, message: msg });
+        }
+
+        let bytes = resp.bytes().await.map_err(AppError::Network)?;
+        Ok(bytes.to_vec())
+    }
+
     // --- Search ---
 
     pub async fn search_posts(

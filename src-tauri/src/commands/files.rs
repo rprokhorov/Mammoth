@@ -99,6 +99,29 @@ pub async fn get_image_data(
     Ok(ImageDataResult { data_url })
 }
 
+/// Fetches the thumbnail (small preview) of an image file as base64 data URL.
+#[tauri::command]
+pub async fn get_image_thumbnail(
+    state: State<'_, AppState>,
+    server_id: String,
+    file_id: String,
+    mime_type: String,
+) -> Result<ImageDataResult, AppError> {
+    let client = {
+        let servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let server = servers
+            .get(&server_id)
+            .ok_or_else(|| AppError::NotFound(format!("Server {} not found", server_id)))?;
+        server.client.clone()
+    };
+
+    let bytes = client.download_thumbnail(&file_id).await?;
+    use base64::Engine;
+    let encoded = base64::engine::general_purpose::STANDARD.encode(&bytes);
+    let data_url = format!("data:{};base64,{}", mime_type, encoded);
+    Ok(ImageDataResult { data_url })
+}
+
 /// Reads a local file and returns it as a base64 data URL.
 /// Used for preview of locally-attached files before upload, and for clipboard images.
 #[tauri::command]

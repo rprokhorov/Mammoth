@@ -23,58 +23,83 @@ interface FileAttachmentProps {
 
 const IMAGE_EXTENSIONS = ["png", "jpg", "jpeg", "gif", "bmp", "webp", "svg"];
 
+// Separate caches for thumbnails and full-size originals
+const thumbnailCache = new Map<string, string>();
+const originalCache = new Map<string, string>();
+
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+// displayUrls: shows thumbnail first, replaced by original when ready
+type ImageUrls = Record<string, string>;
+
 export function FileAttachment({ fileIds, serverId, onImageLoad }: FileAttachmentProps) {
   const [files, setFiles] = useState<FileInfo[]>([]);
-  const [imageUrls, setImageUrls] = useState<Record<string, string>>({});
-  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  const [displayUrls, setDisplayUrls] = useState<ImageUrls>({});
+  const [lightboxFileId, setLightboxFileId] = useState<string | null>(null);
 
-  const closeLightbox = useCallback(() => setLightboxUrl(null), []);
+  const lightboxUrl = lightboxFileId
+    ? (originalCache.get(lightboxFileId) ?? displayUrls[lightboxFileId] ?? null)
+    : null;
+
+  const closeLightbox = useCallback(() => setLightboxFileId(null), []);
 
   useEffect(() => {
-    if (!lightboxUrl) return;
+    if (!lightboxFileId) return;
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") closeLightbox();
     }
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [lightboxUrl, closeLightbox]);
+  }, [lightboxFileId, closeLightbox]);
 
   useEffect(() => {
     if (fileIds.length === 0) return;
 
     Promise.all(
       fileIds.map((id) =>
-        invoke<FileInfo>("get_file_info", { serverId, fileId: id }).catch(
-          () => null,
-        ),
+        invoke<FileInfo>("get_file_info", { serverId, fileId: id }).catch(() => null),
       ),
     ).then((results) => {
       const valid = results.filter(Boolean) as FileInfo[];
       setFiles(valid);
 
-      // Fetch image data as base64 data URLs (avoids CSP/mixed-content blocks)
       for (const file of valid) {
-        if (IMAGE_EXTENSIONS.includes(file.extension.toLowerCase())) {
-          const mimeType = file.mime_type || `image/${file.extension.toLowerCase()}`;
-          invoke<ImageDataResult>("get_image_data", {
-            serverId,
-            fileId: file.id,
-            mimeType,
-          })
+        if (!IMAGE_EXTENSIONS.includes(file.extension.toLowerCase())) continue;
+        const mimeType = file.mime_type || `image/${file.extension.toLowerCase()}`;
+
+        // If original already cached — show it directly
+        if (originalCache.has(file.id)) {
+          setDisplayUrls((prev) => ({ ...prev, [file.id]: originalCache.get(file.id)! }));
+          continue;
+        }
+
+        // Step 1: show thumbnail immediately
+        const loadOriginal = () => {
+          invoke<ImageDataResult>("get_image_data", { serverId, fileId: file.id, mimeType })
             .then((result) => {
-              setImageUrls((prev) => ({
-                ...prev,
-                [file.id]: result.data_url,
-              }));
+              originalCache.set(file.id, result.data_url);
+              setDisplayUrls((prev) => ({ ...prev, [file.id]: result.data_url }));
             })
             .catch(console.error);
+        };
+
+        if (thumbnailCache.has(file.id)) {
+          setDisplayUrls((prev) => ({ ...prev, [file.id]: thumbnailCache.get(file.id)! }));
+          loadOriginal();
+          continue;
         }
+
+        invoke<ImageDataResult>("get_image_thumbnail", { serverId, fileId: file.id, mimeType })
+          .then((result) => {
+            thumbnailCache.set(file.id, result.data_url);
+            setDisplayUrls((prev) => ({ ...prev, [file.id]: result.data_url }));
+          })
+          .catch(() => {/* no thumbnail — skip, original will show */})
+          .finally(() => loadOriginal());
       }
     });
   }, [fileIds.join(","), serverId]);
@@ -83,7 +108,6 @@ export function FileAttachment({ fileIds, serverId, onImageLoad }: FileAttachmen
 
   async function handleDownload(fileId: string, fileName: string) {
     try {
-      // Use a simple download path in Downloads folder
       const savePath = `${await getDownloadsPath()}/${fileName}`;
       await invoke("download_file", { serverId, fileId, savePath });
     } catch (e) {
@@ -96,38 +120,33 @@ export function FileAttachment({ fileIds, serverId, onImageLoad }: FileAttachmen
       <div className="file-attachments">
         {files.map((file) => {
           const isImage = IMAGE_EXTENSIONS.includes(file.extension.toLowerCase());
-          const imgUrl = imageUrls[file.id];
+          const thumbUrl = displayUrls[file.id];
 
           return (
             <div key={file.id} className={`file-attachment ${isImage ? "image" : "generic"}`}>
               {isImage ? (
                 (() => {
-                  // Calculate display dimensions capped at 400×300
                   const origW = file.width || 400;
                   const origH = file.height || 200;
                   const scale = Math.min(400 / origW, 300 / origH, 1);
                   const dispW = Math.round(origW * scale);
                   const dispH = Math.round(origH * scale);
-                  return imgUrl ? (
+                  return thumbUrl ? (
                     <div
                       className="file-image-preview"
-                      onClick={() => setLightboxUrl(imgUrl)}
+                      onClick={() => setLightboxFileId(file.id)}
                       title="Click to enlarge"
                       style={{ width: dispW, height: dispH }}
                     >
                       <img
-                        src={imgUrl}
+                        src={thumbUrl}
                         alt={file.name}
                         style={{ width: dispW, height: dispH, cursor: "zoom-in", display: "block" }}
                         onLoad={onImageLoad}
                       />
                     </div>
                   ) : (
-                    // Reserve exact space while image loads to prevent layout shifts
-                    <div
-                      className="file-image-loading"
-                      style={{ width: dispW, height: dispH }}
-                    >
+                    <div className="file-image-loading" style={{ width: dispW, height: dispH }}>
                       <div className="spinner small" />
                       <span>{file.name}</span>
                     </div>
@@ -165,7 +184,6 @@ export function FileAttachment({ fileIds, serverId, onImageLoad }: FileAttachmen
 }
 
 async function getDownloadsPath(): Promise<string> {
-  // Use Tauri path API if available, fallback to /tmp
   try {
     const { downloadDir } = await import("@tauri-apps/api/path");
     return await downloadDir();
