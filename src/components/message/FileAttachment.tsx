@@ -37,6 +37,15 @@ export function FileAttachment({ fileIds, serverId, onImageLoad }: FileAttachmen
   const closeLightbox = useCallback(() => setLightboxUrl(null), []);
 
   useEffect(() => {
+    if (!lightboxUrl) return;
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") closeLightbox();
+    }
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [lightboxUrl, closeLightbox]);
+
+  useEffect(() => {
     if (fileIds.length === 0) return;
 
     Promise.all(
