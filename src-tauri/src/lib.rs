@@ -113,6 +113,7 @@ pub fn run() {
             commands::upload_file,
             commands::get_file_info,
             commands::get_file_url,
+            commands::get_image_data,
             commands::download_file,
             // Search
             commands::search_posts,

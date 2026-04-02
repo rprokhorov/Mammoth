@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 
 interface FileInfo {
@@ -11,9 +11,8 @@ interface FileInfo {
   height: number;
 }
 
-interface FileUrlResult {
-  url: string;
-  token: string;
+interface ImageDataResult {
+  data_url: string;
 }
 
 interface FileAttachmentProps {
@@ -32,6 +31,9 @@ function formatFileSize(bytes: number): string {
 export function FileAttachment({ fileIds, serverId }: FileAttachmentProps) {
   const [files, setFiles] = useState<FileInfo[]>([]);
   const [imageUrls, setImageUrls] = useState<Record<string, string>>({});
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+
+  const closeLightbox = useCallback(() => setLightboxUrl(null), []);
 
   useEffect(() => {
     if (fileIds.length === 0) return;
@@ -46,17 +48,19 @@ export function FileAttachment({ fileIds, serverId }: FileAttachmentProps) {
       const valid = results.filter(Boolean) as FileInfo[];
       setFiles(valid);
 
-      // Get image URLs
+      // Fetch image data as base64 data URLs (avoids CSP/mixed-content blocks)
       for (const file of valid) {
         if (IMAGE_EXTENSIONS.includes(file.extension.toLowerCase())) {
-          invoke<FileUrlResult>("get_file_url", {
+          const mimeType = file.mime_type || `image/${file.extension.toLowerCase()}`;
+          invoke<ImageDataResult>("get_image_data", {
             serverId,
             fileId: file.id,
+            mimeType,
           })
             .then((result) => {
               setImageUrls((prev) => ({
                 ...prev,
-                [file.id]: `${result.url}?_t=${result.token}`,
+                [file.id]: result.data_url,
               }));
             })
             .catch(console.error);
@@ -78,45 +82,61 @@ export function FileAttachment({ fileIds, serverId }: FileAttachmentProps) {
   }
 
   return (
-    <div className="file-attachments">
-      {files.map((file) => {
-        const isImage = IMAGE_EXTENSIONS.includes(
-          file.extension.toLowerCase(),
-        );
-        const imgUrl = imageUrls[file.id];
+    <>
+      <div className="file-attachments">
+        {files.map((file) => {
+          const isImage = IMAGE_EXTENSIONS.includes(file.extension.toLowerCase());
+          const imgUrl = imageUrls[file.id];
 
-        return (
-          <div key={file.id} className={`file-attachment ${isImage ? "image" : "generic"}`}>
-            {isImage && imgUrl ? (
-              <div className="file-image-preview">
-                <img
-                  src={imgUrl}
-                  alt={file.name}
-                  style={{
-                    maxWidth: Math.min(file.width || 400, 400),
-                    maxHeight: 300,
-                  }}
-                />
-              </div>
-            ) : (
-              <div className="file-generic">
-                <span className="file-icon">📄</span>
-                <div className="file-info">
-                  <span className="file-name">{file.name}</span>
-                  <span className="file-size">{formatFileSize(file.size)}</span>
+          return (
+            <div key={file.id} className={`file-attachment ${isImage ? "image" : "generic"}`}>
+              {isImage ? (
+                imgUrl ? (
+                  <div className="file-image-preview" onClick={() => setLightboxUrl(imgUrl)} title="Click to enlarge">
+                    <img
+                      src={imgUrl}
+                      alt={file.name}
+                      style={{
+                        maxWidth: Math.min(file.width || 400, 400),
+                        maxHeight: 300,
+                        cursor: "zoom-in",
+                      }}
+                    />
+                  </div>
+                ) : (
+                  <div className="file-image-loading">
+                    <div className="spinner small" />
+                    <span>{file.name}</span>
+                  </div>
+                )
+              ) : (
+                <div className="file-generic">
+                  <span className="file-icon">📄</span>
+                  <div className="file-info">
+                    <span className="file-name">{file.name}</span>
+                    <span className="file-size">{formatFileSize(file.size)}</span>
+                  </div>
+                  <button
+                    className="file-download-btn"
+                    onClick={() => handleDownload(file.id, file.name)}
+                  >
+                    ⬇
+                  </button>
                 </div>
-                <button
-                  className="file-download-btn"
-                  onClick={() => handleDownload(file.id, file.name)}
-                >
-                  ⬇
-                </button>
-              </div>
-            )}
-          </div>
-        );
-      })}
-    </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Lightbox */}
+      {lightboxUrl && (
+        <div className="lightbox-overlay" onClick={closeLightbox}>
+          <img className="lightbox-image" src={lightboxUrl} alt="Preview" onClick={(e) => e.stopPropagation()} />
+          <button className="lightbox-close" onClick={closeLightbox}>✕</button>
+        </div>
+      )}
+    </>
   );
 }
 
