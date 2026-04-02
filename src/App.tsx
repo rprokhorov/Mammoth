@@ -15,6 +15,7 @@ import { TypingIndicator } from "@/components/message/TypingIndicator";
 import { ThreadsView } from "@/components/message/ThreadsView";
 import { useThreadsStore, type UserThread } from "@/stores/threadsStore";
 import { useTabsStore } from "@/stores/tabsStore";
+import { useCustomEmojiStore, type CustomEmoji } from "@/stores/customEmojiStore";
 import { SearchBar } from "@/components/search/SearchBar";
 import { TabBar } from "@/components/layout/TabBar";
 
@@ -243,6 +244,8 @@ function AppContent() {
         if (teamId) {
           loadUserThreads(targetId, teamId).catch(() => {});
         }
+        // Load custom emojis in background
+        loadCustomEmojis(targetId).catch(() => {});
         store.setCurrentView("main");
       } catch (e) {
         console.error("Session restore failed:", e);
@@ -290,7 +293,19 @@ function AppContent() {
       loadUserThreads(serverId, teamId).catch(() => {});
     }
 
+    // Load custom emojis in background
+    loadCustomEmojis(serverId).catch(() => {});
+
     store.setCurrentView("main");
+  }
+
+  async function loadCustomEmojis(serverId: string) {
+    try {
+      const list = await invoke<CustomEmoji[]>("get_custom_emojis", { serverId });
+      useCustomEmojiStore.getState().setEmojis(list);
+    } catch (e) {
+      console.error("Failed to load custom emojis:", e);
+    }
   }
 
   async function loadTeams(serverId: string) {

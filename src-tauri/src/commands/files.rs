@@ -122,6 +122,74 @@ pub async fn get_image_thumbnail(
     Ok(ImageDataResult { data_url })
 }
 
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct CustomEmoji {
+    pub id: String,
+    pub name: String,
+}
+
+/// Returns all custom emojis for the server (fetches all pages).
+#[tauri::command]
+pub async fn get_custom_emojis(
+    state: State<'_, AppState>,
+    server_id: String,
+) -> Result<Vec<CustomEmoji>, AppError> {
+    let client = {
+        let servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let server = servers
+            .get(&server_id)
+            .ok_or_else(|| AppError::NotFound(format!("Server {} not found", server_id)))?;
+        server.client.clone()
+    };
+
+    let mut all = Vec::new();
+    let mut page = 0u32;
+    loop {
+        let batch = client.get_custom_emojis(page, 200).await?;
+        let len = batch.len();
+        for item in batch {
+            if let (Some(id), Some(name)) = (
+                item["id"].as_str().map(str::to_string),
+                item["name"].as_str().map(str::to_string),
+            ) {
+                all.push(CustomEmoji { id, name });
+            }
+        }
+        if len < 200 { break; }
+        page += 1;
+    }
+    Ok(all)
+}
+
+/// Downloads a custom emoji image and returns it as a base64 data URL.
+#[tauri::command]
+pub async fn get_custom_emoji_image(
+    state: State<'_, AppState>,
+    server_id: String,
+    emoji_id: String,
+) -> Result<ImageDataResult, AppError> {
+    let client = {
+        let servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let server = servers
+            .get(&server_id)
+            .ok_or_else(|| AppError::NotFound(format!("Server {} not found", server_id)))?;
+        server.client.clone()
+    };
+
+    let bytes = client.download_custom_emoji_image(&emoji_id).await?;
+    // Detect mime type from magic bytes
+    let mime = if bytes.starts_with(b"\x89PNG") {
+        "image/png"
+    } else if bytes.starts_with(b"GIF") {
+        "image/gif"
+    } else {
+        "image/png"
+    };
+    use base64::Engine;
+    let encoded = base64::engine::general_purpose::STANDARD.encode(&bytes);
+    Ok(ImageDataResult { data_url: format!("data:{};base64,{}", mime, encoded) })
+}
+
 /// Reads a local file and returns it as a base64 data URL.
 /// Used for preview of locally-attached files before upload, and for clipboard images.
 #[tauri::command]

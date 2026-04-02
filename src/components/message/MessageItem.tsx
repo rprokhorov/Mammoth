@@ -3,7 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { useUiStore } from "@/stores/uiStore";
 import { useThreadsStore } from "@/stores/threadsStore";
 import { useMessagesStore, type PostData } from "@/stores/messagesStore";
-import { MarkdownRenderer } from "./MarkdownRenderer";
+import { CustomEmojiRenderer } from "./CustomEmojiRenderer";
 import { PresenceDot } from "./PresenceDot";
 import { FileAttachment } from "./FileAttachment";
 import { UserPopover } from "@/components/user/UserPopover";
@@ -156,7 +156,7 @@ export const MessageItem = memo(function MessageItem({
           className="message-body"
           onMouseDown={!post.root_id ? (e) => { if (e.button === 1) { e.preventDefault(); handleOpenThread(); } } : undefined}
         >
-          <MarkdownRenderer text={post.message} />
+          <CustomEmojiRenderer text={post.message} />
           {isEdited && <span className="message-edited">(edited)</span>}
         </div>
 

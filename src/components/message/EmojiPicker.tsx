@@ -1,4 +1,6 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, memo } from "react";
+import { useCustomEmojiStore } from "@/stores/customEmojiStore";
+import { useCustomEmojiImage } from "@/hooks/useCustomEmojiImage";
 
 interface EmojiPickerProps {
   onSelect: (emoji: string) => void;
@@ -66,10 +68,25 @@ export function emojiNameToUnicode(name: string): string {
   return EMOJI_MAP[name] || `:${name}:`;
 }
 
+const CustomEmojiBtn = memo(function CustomEmojiBtn({
+  id, name, onSelect,
+}: { id: string; name: string; onSelect: (name: string) => void }) {
+  const url = useCustomEmojiImage(id);
+  return (
+    <button className="emoji-btn custom-emoji-btn" onClick={() => onSelect(name)} title={`:${name}:`}>
+      {url
+        ? <img src={url} alt={name} style={{ width: 22, height: 22, objectFit: "contain" }} />
+        : <span style={{ fontSize: 10, color: "var(--text-muted)" }}>…</span>
+      }
+    </button>
+  );
+});
+
 export function EmojiPicker({ onSelect, onClose, triggerRef }: EmojiPickerProps) {
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState("Smileys");
   const pickerRef = useRef<HTMLDivElement>(null);
+  const customEmojis = useCustomEmojiStore((s) => s.emojis);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -90,11 +107,15 @@ export function EmojiPicker({ onSelect, onClose, triggerRef }: EmojiPickerProps)
     };
   }, [onClose, triggerRef]);
 
-  const filteredEmojis = search
-    ? Object.values(EMOJI_CATEGORIES)
-        .flat()
-        .filter((name) => name.includes(search.toLowerCase()))
-    : EMOJI_CATEGORIES[activeCategory] || [];
+  const isCustomTab = activeCategory === "__custom__";
+
+  const filteredStandard = search
+    ? Object.values(EMOJI_CATEGORIES).flat().filter((n) => n.includes(search.toLowerCase()))
+    : (!isCustomTab ? EMOJI_CATEGORIES[activeCategory] || [] : []);
+
+  const filteredCustom = search
+    ? customEmojis.filter((e) => e.name.includes(search.toLowerCase()))
+    : (isCustomTab ? customEmojis : []);
 
   return (
     <div className="emoji-picker" ref={pickerRef}>
@@ -119,19 +140,26 @@ export function EmojiPicker({ onSelect, onClose, triggerRef }: EmojiPickerProps)
               {cat.charAt(0)}
             </button>
           ))}
+          {customEmojis.length > 0 && (
+            <button
+              className={`emoji-cat-btn ${activeCategory === "__custom__" ? "active" : ""}`}
+              onClick={() => setActiveCategory("__custom__")}
+              title="Custom"
+            >
+              ★
+            </button>
+          )}
         </div>
       )}
 
       <div className="emoji-picker-grid">
-        {filteredEmojis.map((name) => (
-          <button
-            key={name}
-            className="emoji-btn"
-            onClick={() => onSelect(name)}
-            title={`:${name}:`}
-          >
+        {filteredStandard.map((name) => (
+          <button key={name} className="emoji-btn" onClick={() => onSelect(name)} title={`:${name}:`}>
             {EMOJI_MAP[name] || `:${name}:`}
           </button>
+        ))}
+        {(isCustomTab || search) && filteredCustom.map((e) => (
+          <CustomEmojiBtn key={e.id} id={e.id} name={e.name} onSelect={onSelect} />
         ))}
       </div>
     </div>

@@ -1296,6 +1296,36 @@ impl MattermostClient {
         Ok(())
     }
 
+    pub async fn get_custom_emojis(&self, page: u32, per_page: u32) -> Result<Vec<serde_json::Value>, AppError> {
+        let resp = self
+            .get_authenticated(&format!("/emoji?page={}&per_page={}&sort=name", page, per_page))
+            .await?;
+        if !resp.status().is_success() {
+            let status = resp.status().as_u16();
+            let msg = resp.text().await.unwrap_or_default();
+            return Err(AppError::Api { status, message: msg });
+        }
+        let list: Vec<serde_json::Value> = resp.json().await.map_err(AppError::Network)?;
+        Ok(list)
+    }
+
+    pub async fn download_custom_emoji_image(&self, emoji_id: &str) -> Result<Vec<u8>, AppError> {
+        let auth = self.auth_header()?;
+        let resp = self
+            .http
+            .get(self.api_url(&format!("/emoji/{}/image", emoji_id)))
+            .header(header::AUTHORIZATION, &auth)
+            .send()
+            .await?;
+        if !resp.status().is_success() {
+            let status = resp.status().as_u16();
+            let msg = resp.text().await.unwrap_or_default();
+            return Err(AppError::Api { status, message: msg });
+        }
+        let bytes = resp.bytes().await.map_err(AppError::Network)?;
+        Ok(bytes.to_vec())
+    }
+
     /// Get WebSocket URL for this server
     pub fn websocket_url(&self) -> Result<String, AppError> {
         let base = self.base_url.as_str();
