@@ -150,7 +150,10 @@ export const MessageItem = memo(function MessageItem({
             {post.is_pinned && <span className="pin-badge">pinned</span>}
           </div>
         )}
-        <div className="message-body">
+        <div
+          className="message-body"
+          onMouseDown={!post.root_id ? (e) => { if (e.button === 1) { e.preventDefault(); handleOpenThread(); } } : undefined}
+        >
           <MarkdownRenderer text={post.message} />
           {isEdited && <span className="message-edited">(edited)</span>}
         </div>

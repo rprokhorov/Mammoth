@@ -42,6 +42,8 @@ export function ThreadPanel({ serverId, currentUserId }: ThreadPanelProps) {
     let cancelled = false;
 
     const { setThreadLoading, setThreadData, markThreadRead } = useThreadsStore.getState();
+    // Clear cached order for this thread so stale posts don't flash
+    setThreadData(activeThreadId, [], {});
     setThreadLoading(true);
 
     invoke<PostsResponse>("get_post_thread", {
