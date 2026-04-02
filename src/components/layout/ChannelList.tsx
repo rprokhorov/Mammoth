@@ -8,9 +8,10 @@ interface ChannelListProps {
   onSelectChannel: (channelId: string) => void;
   onCreateChannel?: () => void;
   serverId?: string | null;
+  currentUserId?: string | null;
 }
 
-export function ChannelList({ onSelectChannel, onCreateChannel, serverId }: ChannelListProps) {
+export function ChannelList({ onSelectChannel, onCreateChannel, serverId, currentUserId }: ChannelListProps) {
   const channels = useUiStore((s) => s.channels);
   const activeChannelId = useUiStore((s) => s.activeChannelId);
   const users = useUiStore((s) => s.users);
@@ -38,7 +39,16 @@ export function ChannelList({ onSelectChannel, onCreateChannel, serverId }: Chan
 
   function getDisplayName(channel: ChannelInfo): string {
     if (channel.channel_type === "D") {
+      // DM name is "userId1__userId2" — show the OTHER user, not the current one
       const parts = channel.name.split("__");
+      for (const part of parts) {
+        if (part === currentUserId) continue;
+        const user = users[part];
+        if (user) {
+          return user.nickname || `${user.first_name} ${user.last_name}`.trim() || user.username;
+        }
+      }
+      // Fallback: show any user found
       for (const part of parts) {
         const user = users[part];
         if (user) {

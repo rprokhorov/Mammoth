@@ -456,6 +456,7 @@ function AppContent() {
                 onSelectChannel={handleSelectChannel}
                 onCreateChannel={() => setShowCreateChannel(true)}
                 serverId={activeServerId}
+                currentUserId={currentUserId}
               />
             </div>
             <div className="main-panel">
