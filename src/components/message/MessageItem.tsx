@@ -116,10 +116,10 @@ export const MessageItem = memo(function MessageItem({
       { serverId, postId: post.id },
     )
       .then((reactions) => {
-        useMessagesStore.getState().updatePost({
-          ...post,
-          metadata: { ...post.metadata, reactions },
-        });
+        const updated = { ...post, metadata: { ...post.metadata, reactions } };
+        useMessagesStore.getState().updatePost(updated);
+        // Also update in threads store if this post is a thread post
+        useThreadsStore.getState().updateThreadPost(updated);
       })
       .catch(console.error);
   }

@@ -45,13 +45,32 @@ export function ThreadPanel({ serverId, currentUserId }: ThreadPanelProps) {
       serverId,
       postId: activeThreadId,
     })
-      .then((res) => {
+      .then(async (res) => {
         if (cancelled) return;
         // Sort posts by create_at ascending (oldest first)
         const displayOrder = Object.values(res.posts)
           .sort((a, b) => a.create_at - b.create_at)
           .map((p) => p.id);
-        setThreadData(activeThreadId, displayOrder, res.posts);
+
+        // Load reactions for all posts in the thread
+        const postsWithReactions = { ...res.posts };
+        await Promise.all(
+          Object.keys(res.posts).map(async (postId) => {
+            try {
+              const reactions = await invoke<Array<{ user_id: string; post_id: string; emoji_name: string; create_at: number }>>(
+                "get_reactions", { serverId, postId }
+              );
+              postsWithReactions[postId] = {
+                ...postsWithReactions[postId],
+                metadata: { ...postsWithReactions[postId].metadata, reactions },
+              };
+            } catch {
+              // ignore reaction load errors
+            }
+          })
+        );
+
+        setThreadData(activeThreadId, displayOrder, postsWithReactions);
         requestAnimationFrame(() => {
           bottomRef.current?.scrollIntoView();
         });
@@ -170,6 +189,8 @@ export function ThreadPanel({ serverId, currentUserId }: ThreadPanelProps) {
                   onEdit={() => {}}
                   onDelete={() => {}}
                   currentUserId={currentUserId}
+                  serverId={serverId}
+                  hideThreadIndicator={true}
                 />
               </div>
             )}
@@ -194,6 +215,8 @@ export function ThreadPanel({ serverId, currentUserId }: ThreadPanelProps) {
                     onEdit={() => {}}
                     onDelete={() => {}}
                     currentUserId={currentUserId}
+                    serverId={serverId}
+                    hideThreadIndicator={true}
                   />
                 );
               })}
