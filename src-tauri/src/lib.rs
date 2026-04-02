@@ -1,0 +1,152 @@
+mod commands;
+mod errors;
+mod mattermost;
+mod state;
+mod storage;
+mod tray;
+
+use tauri::Manager;
+use state::AppState;
+
+#[tauri::command]
+fn set_badge_count(app: tauri::AppHandle, count: u32) -> Result<(), String> {
+    if let Some(tray) = app.tray_by_id("main-tray") {
+        if count > 0 {
+            let _ = tray.set_tooltip(Some(&format!("Mattermost Desktop — {} unread", count)));
+        } else {
+            let _ = tray.set_tooltip(Some("Mattermost Desktop"));
+        }
+    }
+
+    // macOS dock badge / Linux badge count
+    if let Some(window) = app.get_webview_window("main") {
+        if count > 0 {
+            let _ = window.set_badge_count(Some(count as i64));
+        } else {
+            let _ = window.set_badge_count(None);
+        }
+    }
+
+    Ok(())
+}
+
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
+pub fn run() {
+    let app_state = AppState::new();
+
+    tauri::Builder::default()
+        .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_dialog::init())
+        .manage(app_state)
+        .setup(|app| {
+            if cfg!(debug_assertions) {
+                app.handle().plugin(
+                    tauri_plugin_log::Builder::default()
+                        .level(log::LevelFilter::Info)
+                        .build(),
+                )?;
+            }
+
+            // Create system tray
+            if let Err(e) = tray::create_tray(app.handle()) {
+                log::warn!("Failed to create tray: {}", e);
+            }
+
+            // Restore saved servers from config
+            let state = app.state::<AppState>();
+            if let Err(e) = commands::servers::restore_servers(app.handle(), &state) {
+                log::warn!("Failed to restore servers: {}", e);
+            }
+
+            // Close-to-tray: hide window instead of quitting
+            let main_window = app.get_webview_window("main");
+            if let Some(window) = main_window {
+                let w = window.clone();
+                window.on_window_event(move |event| {
+                    if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                        api.prevent_close();
+                        let _ = w.hide();
+                    }
+                });
+            }
+
+            Ok(())
+        })
+        .invoke_handler(tauri::generate_handler![
+            // Auth
+            commands::ping_server,
+            commands::login,
+            commands::login_with_token,
+            commands::open_sso_window,
+            commands::complete_sso_login,
+            commands::logout,
+            commands::get_me,
+            commands::validate_session,
+            // Servers
+            commands::add_server,
+            commands::remove_server,
+            commands::list_servers,
+            commands::set_active_server,
+            commands::get_active_server,
+            // WebSocket
+            commands::connect_ws,
+            commands::disconnect_ws,
+            // Teams
+            commands::get_teams,
+            // Channels
+            commands::get_channels_for_team,
+            commands::get_channel,
+            commands::view_channel,
+            commands::get_users_by_ids,
+            // Messages
+            commands::get_posts,
+            commands::send_post,
+            commands::edit_post,
+            commands::delete_post,
+            // Threads
+            commands::get_post_thread,
+            commands::get_user_threads,
+            commands::follow_thread,
+            commands::unfollow_thread,
+            commands::mark_thread_as_read,
+            // Files
+            commands::upload_file,
+            commands::get_file_info,
+            commands::get_file_url,
+            commands::download_file,
+            // Search
+            commands::search_posts,
+            // Channel Management
+            commands::create_channel,
+            commands::update_channel,
+            commands::archive_channel,
+            commands::leave_channel,
+            // Reactions & Pins
+            commands::add_reaction,
+            commands::remove_reaction,
+            commands::get_reactions,
+            commands::pin_post,
+            commands::unpin_post,
+            commands::save_post,
+            commands::unsave_post,
+            commands::get_saved_posts,
+            commands::get_pinned_posts,
+            // Profile
+            commands::get_user_profile,
+            commands::update_profile,
+            commands::upload_avatar,
+            commands::get_profile_image_url,
+            commands::set_user_status,
+            // Custom Status & Favorites & Notification Prefs
+            commands::set_custom_status,
+            commands::clear_custom_status,
+            commands::get_channel_notify_props,
+            commands::update_channel_notify_props,
+            commands::get_favorite_channels,
+            commands::toggle_favorite_channel,
+            // Tray / Badge
+            set_badge_count,
+        ])
+        .run(tauri::generate_context!())
+        .expect("error while running tauri application");
+}

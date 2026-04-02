@@ -1,0 +1,40 @@
+{
+    "id": "mattermost-ai",
+    "name": "Agents",
+    "homepage_url": "https://github.com/mattermost/mattermost-plugin-ai",
+    "support_url": "https://github.com/mattermost/mattermost-plugin-ai/issues",
+    "release_notes_url": "https://github.com/mattermost/mattermost-plugin-ai",
+    "icon_path": "assets/bot_icon.png",
+    "version": "1.7.2",
+    "min_server_version": "6.2.1",
+    "server": {
+        "executables": {
+            "darwin-amd64": "server/dist/plugin-darwin-amd64",
+            "darwin-arm64": "server/dist/plugin-darwin-arm64",
+            "linux-amd64": "server/dist/plugin-linux-amd64",
+            "linux-arm64": "server/dist/plugin-linux-arm64",
+            "windows-amd64": "server/dist/plugin-windows-amd64.exe"
+        },
+        "executable": ""
+    },
+    "webapp": {
+        "bundle_path": "webapp/dist/main.js"
+    },
+    "settings_schema": {
+        "header": "",
+        "footer": "",
+        "settings": [
+            {
+                "key": "Config",
+                "display_name": "",
+                "type": "custom",
+                "help_text": "",
+                "placeholder": "",
+                "default": null,
+                "hosting": "",
+                "secret": false
+            }
+        ],
+        "sections": null
+    }
+}

@@ -1,0 +1,71 @@
+{
+    "id": "playbooks",
+    "name": "Playbooks",
+    "description": "Mattermost Playbooks enable reliable and repeatable processes for your teams using checklists, automation, and retrospectives.",
+    "homepage_url": "https://github.com/mattermost/mattermost-plugin-playbooks/",
+    "support_url": "https://github.com/mattermost/mattermost-plugin-playbooks/issues",
+    "release_notes_url": "https://github.com/mattermost/mattermost-plugin-playbooks/releases/tag/v2.7.0-rc1",
+    "icon_path": "assets/plugin_icon.svg",
+    "version": "2.7.0",
+    "min_server_version": "11.0.0",
+    "server": {
+        "executables": {
+            "darwin-amd64": "server/dist/plugin-darwin-amd64",
+            "darwin-arm64": "server/dist/plugin-darwin-arm64",
+            "linux-amd64": "server/dist/plugin-linux-amd64",
+            "linux-arm64": "server/dist/plugin-linux-arm64",
+            "windows-amd64": "server/dist/plugin-windows-amd64.exe"
+        },
+        "executable": ""
+    },
+    "webapp": {
+        "bundle_path": "webapp/dist/main.js"
+    },
+    "settings_schema": {
+        "header": "",
+        "footer": "",
+        "settings": [
+            {
+                "key": "enableTeamsTabApp",
+                "display_name": "Enable Teams Tab App",
+                "type": "bool",
+                "help_text": "When true, enable a Microsoft Teams Tab app to expose Mattermost Playbook runs.",
+                "placeholder": "",
+                "default": false,
+                "hosting": "",
+                "secret": false
+            },
+            {
+                "key": "teamsTabAppTenantIDs",
+                "display_name": "Authorized Tenant IDs for Teams Tab App",
+                "type": "text",
+                "help_text": "A comma separated list of Microsoft Tenant IDs allowed to access Playbook runs.",
+                "placeholder": "",
+                "default": "",
+                "hosting": "",
+                "secret": false
+            },
+            {
+                "key": "EnableExperimentalFeatures",
+                "display_name": "Enable Experimental Features:",
+                "type": "bool",
+                "help_text": "Enable experimental features that come with in-progress UI, bugs, and cool stuff.",
+                "placeholder": "",
+                "default": null,
+                "hosting": "",
+                "secret": false
+            },
+            {
+                "key": "enableincrementalupdates",
+                "display_name": "Enable Incremental Updates",
+                "type": "bool",
+                "help_text": "When enabled, sends incremental WebSocket updates instead of full playbook run objects for better performance.",
+                "placeholder": "",
+                "default": false,
+                "hosting": "",
+                "secret": false
+            }
+        ],
+        "sections": null
+    }
+}
