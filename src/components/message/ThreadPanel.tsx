@@ -33,6 +33,7 @@ export function ThreadPanel({ serverId, currentUserId, width }: ThreadPanelProps
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [emojiPickerStyle, setEmojiPickerStyle] = useState<React.CSSProperties>({});
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const emojiTriggerRef = useRef<HTMLButtonElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -265,14 +266,28 @@ export function ThreadPanel({ serverId, currentUserId, width }: ThreadPanelProps
             <button
               ref={emojiTriggerRef}
               className="composer-emoji-btn"
-              onClick={() => setShowEmojiPicker((v) => !v)}
+              onClick={() => {
+                setShowEmojiPicker((v) => {
+                  if (!v && emojiTriggerRef.current) {
+                    const rect = emojiTriggerRef.current.getBoundingClientRect();
+                    const pickerHeight = 360;
+                    const spaceAbove = rect.top;
+                    if (spaceAbove >= pickerHeight) {
+                      setEmojiPickerStyle({ bottom: "calc(100% + 6px)", top: "auto", right: 0 });
+                    } else {
+                      setEmojiPickerStyle({ top: "calc(100% + 6px)", bottom: "auto", right: 0 });
+                    }
+                  }
+                  return !v;
+                });
+              }}
               title="Emoji"
               disabled={sending}
             >
               😊
             </button>
             {showEmojiPicker && (
-              <div className="composer-emoji-popup">
+              <div className="composer-emoji-popup" style={emojiPickerStyle}>
                 <EmojiPicker
                   onSelect={insertEmojiFromPicker}
                   onClose={() => setShowEmojiPicker(false)}

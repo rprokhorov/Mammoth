@@ -1,4 +1,5 @@
 import { useState, useRef, memo } from "react";
+import type React from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useUiStore } from "@/stores/uiStore";
 import { useThreadsStore } from "@/stores/threadsStore";
@@ -35,7 +36,9 @@ export const MessageItem = memo(function MessageItem({
   const user = users[post.user_id];
   const [showPopover, setShowPopover] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [emojiPickerStyle, setEmojiPickerStyle] = useState<React.CSSProperties>({});
   const avatarRef = useRef<HTMLDivElement>(null);
+  const reactionBtnRef = useRef<HTMLButtonElement>(null);
 
   const displayName = user
     ? user.nickname ||
@@ -188,8 +191,20 @@ export const MessageItem = memo(function MessageItem({
         {/* Action buttons */}
         <div className="message-actions">
           <button
+            ref={reactionBtnRef}
             className="message-action-btn"
-            onClick={() => setShowEmojiPicker(true)}
+            onClick={() => {
+              if (!showEmojiPicker && reactionBtnRef.current) {
+                const rect = reactionBtnRef.current.getBoundingClientRect();
+                const pickerHeight = 360;
+                if (rect.top >= pickerHeight) {
+                  setEmojiPickerStyle({ bottom: "calc(100% + 6px)", top: "auto", right: 0 });
+                } else {
+                  setEmojiPickerStyle({ top: "calc(100% + 6px)", bottom: "auto", right: 0 });
+                }
+              }
+              setShowEmojiPicker(true);
+            }}
             title="Add reaction"
             aria-label="Add reaction"
           >
@@ -239,7 +254,7 @@ export const MessageItem = memo(function MessageItem({
 
         {/* Emoji picker */}
         {showEmojiPicker && (
-          <div className="emoji-picker-anchor">
+          <div className="emoji-picker-anchor" style={emojiPickerStyle}>
             <EmojiPicker
               onSelect={handleAddReaction}
               onClose={() => setShowEmojiPicker(false)}

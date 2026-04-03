@@ -1228,8 +1228,6 @@ button.secondary:hover:not(:disabled) {
 
 .composer-emoji-popup {
   position: absolute;
-  bottom: calc(100% + 6px);
-  right: 0;
   z-index: 200;
 }
 
@@ -2343,8 +2341,6 @@ button.secondary:hover:not(:disabled) {
 /* ===== Emoji Picker ===== */
 .emoji-picker-anchor {
   position: absolute;
-  right: 0;
-  top: -8px;
   z-index: 1002;
 }
 .emoji-picker {

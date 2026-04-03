@@ -142,10 +142,11 @@ pub async fn get_custom_emojis(
         server.client.clone()
     };
 
+    let per_page = 100u32;
     let mut all = Vec::new();
     let mut page = 0u32;
     loop {
-        let batch = client.get_custom_emojis(page, 200).await?;
+        let batch = client.get_custom_emojis(page, per_page).await?;
         let len = batch.len();
         for item in batch {
             if let (Some(id), Some(name)) = (
@@ -155,7 +156,7 @@ pub async fn get_custom_emojis(
                 all.push(CustomEmoji { id, name });
             }
         }
-        if len < 200 { break; }
+        if len < per_page as usize { break; }
         page += 1;
     }
     Ok(all)
