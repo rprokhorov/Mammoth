@@ -1,5 +1,5 @@
 use serde::Serialize;
-use tauri::{Manager, State};
+use tauri::{Emitter, Manager, State};
 
 use crate::errors::AppError;
 use crate::mattermost::client::MattermostClient;
@@ -62,6 +62,23 @@ pub async fn remove_server(
     app_handle: tauri::AppHandle,
     server_id: String,
 ) -> Result<(), AppError> {
+    // Disconnect WS and attempt logout to invalidate the session token
+    let client_opt = {
+        let mut servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        if let Some(server) = servers.get_mut(&server_id) {
+            if let Some(ws) = server.ws_manager.take() {
+                ws.disconnect();
+            }
+            Some(server.client.clone())
+        } else {
+            None
+        }
+    };
+    if let Some(mut client) = client_opt {
+        // Best-effort logout — ignore errors
+        let _ = client.logout().await;
+    }
+
     {
         let mut servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
         servers.remove(&server_id);
@@ -198,6 +215,46 @@ pub fn save_active_server(
     let mut config = load_config(app_handle)?;
     config.active_server_id = server_id.map(|s| s.to_string());
     save_config(app_handle, &config)
+}
+
+/// Returns the Mattermost server version string.
+#[tauri::command]
+pub async fn get_server_version(
+    state: State<'_, AppState>,
+    server_id: String,
+) -> Result<String, AppError> {
+    let client = {
+        let servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let server = servers
+            .get(&server_id)
+            .ok_or_else(|| AppError::NotFound(format!("Server {} not found", server_id)))?;
+        server.client.clone()
+    };
+    client.get_server_version().await
+}
+
+/// Clears all in-memory caches (images, etc.). The frontend Zustand stores
+/// are reset via a page reload triggered after this command.
+#[tauri::command]
+pub async fn clear_app_cache(
+    app_handle: tauri::AppHandle,
+) -> Result<(), AppError> {
+    // Clear any temp files created by save_temp_file
+    let tmp_dir = std::env::temp_dir();
+    if let Ok(entries) = std::fs::read_dir(&tmp_dir) {
+        for entry in entries.flatten() {
+            let name = entry.file_name();
+            let name = name.to_string_lossy();
+            // Only remove files we created (clipboard_*.png pattern)
+            if name.starts_with("clipboard_") && name.ends_with(".png") {
+                let _ = std::fs::remove_file(entry.path());
+            }
+        }
+    }
+
+    // Emit event so frontend can reload / clear its stores
+    let _ = app_handle.emit("cache-cleared", ());
+    Ok(())
 }
 
 /// Load saved servers into AppState on startup

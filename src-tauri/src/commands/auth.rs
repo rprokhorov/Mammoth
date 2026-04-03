@@ -361,7 +361,7 @@ pub async fn open_sso_window(
                     Ok(cookies) => {
                         eprintln!("SSO cookies (attempt {}): {} cookies found", attempt, cookies.len());
                         for cookie in &cookies {
-                            eprintln!("  cookie: {}={}", cookie.name(), &cookie.value()[..20.min(cookie.value().len())]);
+                            eprintln!("  cookie: {} (len={})", cookie.name(), cookie.value().len());
                         }
 
                         // Find MMAUTHTOKEN

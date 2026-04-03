@@ -155,6 +155,9 @@ pub fn run() {
             commands::create_sidebar_category,
             commands::update_sidebar_category,
             commands::delete_sidebar_category,
+            // Server utils
+            commands::get_server_version,
+            commands::clear_app_cache,
             // Tray / Badge
             set_badge_count,
         ])

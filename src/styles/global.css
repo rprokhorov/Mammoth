@@ -2093,6 +2093,26 @@ button.secondary:hover:not(:disabled) {
   color: var(--text-primary);
   font-size: 13px;
 }
+.settings-value-text {
+  font-size: 13px;
+  color: var(--text-muted);
+  font-family: monospace;
+}
+.modal-content {
+  display: flex;
+  flex-direction: column;
+}
+.modal-content .modal-header {
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  background: var(--bg-secondary);
+  z-index: 1;
+}
+.modal-content .settings-sections {
+  overflow-y: auto;
+  flex: 1;
+}
 
 /* Toggle switch */
 .settings-toggle {

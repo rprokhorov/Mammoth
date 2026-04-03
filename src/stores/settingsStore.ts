@@ -7,6 +7,7 @@ export interface AppSettings {
   sendOnEnter: boolean;
   showTimestamps: boolean;
   notificationsEnabled: boolean;
+  developerMode: boolean;
 }
 
 const DEFAULTS: AppSettings = {
@@ -16,6 +17,7 @@ const DEFAULTS: AppSettings = {
   sendOnEnter: true,
   showTimestamps: true,
   notificationsEnabled: true,
+  developerMode: false,
 };
 
 const STORAGE_KEY = "mm-desktop-settings";
@@ -54,6 +56,7 @@ export const useSettingsStore = create<SettingsState>((set) => ({
         sendOnEnter: next.sendOnEnter,
         showTimestamps: next.showTimestamps,
         notificationsEnabled: next.notificationsEnabled,
+        developerMode: next.developerMode,
       });
       return { [key]: value };
     }),

@@ -91,6 +91,25 @@ impl MattermostClient {
         Ok(resp.status().is_success())
     }
 
+    pub async fn get_server_version(&self) -> Result<String, AppError> {
+        let resp = self
+            .http
+            .get(self.api_url("/system/ping"))
+            .send()
+            .await
+            .map_err(AppError::Network)?;
+
+        // Mattermost returns X-Version-Id header
+        if let Some(ver) = resp.headers().get("X-Version-Id") {
+            if let Ok(s) = ver.to_str() {
+                return Ok(s.to_string());
+            }
+        }
+        // Fallback: parse JSON
+        let body: serde_json::Value = resp.json().await.map_err(AppError::Network)?;
+        Ok(body["version"].as_str().unwrap_or("unknown").to_string())
+    }
+
     pub async fn login(&mut self, login_id: &str, password: &str) -> Result<User, AppError> {
         let req = LoginRequest {
             login_id: login_id.to_string(),

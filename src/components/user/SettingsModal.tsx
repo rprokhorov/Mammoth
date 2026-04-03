@@ -1,5 +1,7 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import { useSettingsStore, type AppSettings } from "@/stores/settingsStore";
+import { useUiStore } from "@/stores/uiStore";
 
 interface SettingsModalProps {
   onClose: () => void;
@@ -7,6 +9,10 @@ interface SettingsModalProps {
 
 export function SettingsModal({ onClose }: SettingsModalProps) {
   const settings = useSettingsStore();
+  const activeServerId = useUiStore((s) => s.activeServerId);
+  const [serverVersion, setServerVersion] = useState<string | null>(null);
+  const [clearing, setClearing] = useState(false);
+  const [clearMsg, setClearMsg] = useState<string | null>(null);
 
   useEffect(() => {
     function handleEscape(e: KeyboardEvent) {
@@ -16,8 +22,28 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
     return () => document.removeEventListener("keydown", handleEscape);
   }, [onClose]);
 
+  useEffect(() => {
+    if (!activeServerId) return;
+    invoke<string>("get_server_version", { serverId: activeServerId })
+      .then(setServerVersion)
+      .catch(() => setServerVersion(null));
+  }, [activeServerId]);
+
   function toggle<K extends keyof AppSettings>(key: K) {
     settings.updateSetting(key, !settings[key] as AppSettings[K]);
+  }
+
+  async function handleClearCache() {
+    setClearing(true);
+    setClearMsg(null);
+    try {
+      await invoke("clear_app_cache");
+      setClearMsg("Cache cleared. Reload the app to apply.");
+    } catch {
+      setClearMsg("Failed to clear cache.");
+    } finally {
+      setClearing(false);
+    }
   }
 
   return (
@@ -31,6 +57,7 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
         </div>
 
         <div className="settings-sections">
+          {/* Display */}
           <div className="settings-section">
             <h3>Display</h3>
 
@@ -96,6 +123,7 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
             </div>
           </div>
 
+          {/* Messages */}
           <div className="settings-section">
             <h3>Messages</h3>
 
@@ -117,6 +145,7 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
             </div>
           </div>
 
+          {/* Notifications */}
           <div className="settings-section">
             <h3>Notifications</h3>
 
@@ -135,6 +164,65 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
             </div>
           </div>
 
+          {/* Advanced */}
+          <div className="settings-section">
+            <h3>Advanced</h3>
+
+            <div className="settings-row">
+              <div className="settings-label">
+                <span>Developer Mode</span>
+                <span className="settings-desc">Show debug info and performance stats</span>
+              </div>
+              <label className="settings-toggle">
+                <input
+                  type="checkbox"
+                  checked={settings.developerMode}
+                  onChange={() => toggle("developerMode")}
+                />
+                <span className="toggle-slider" />
+              </label>
+            </div>
+
+            <div className="settings-row">
+              <div className="settings-label">
+                <span>Clear Cache</span>
+                <span className="settings-desc">Remove cached images and temp files</span>
+              </div>
+              <button
+                className="btn btn-secondary"
+                onClick={handleClearCache}
+                disabled={clearing}
+              >
+                {clearing ? "Clearing…" : "Clear Cache"}
+              </button>
+            </div>
+            {clearMsg && (
+              <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "4px 0 0" }}>
+                {clearMsg}
+              </p>
+            )}
+          </div>
+
+          {/* About */}
+          <div className="settings-section">
+            <h3>About</h3>
+            <div className="settings-row">
+              <div className="settings-label">
+                <span>App Version</span>
+              </div>
+              <span className="settings-value-text">0.1.0</span>
+            </div>
+            {serverVersion && (
+              <div className="settings-row">
+                <div className="settings-label">
+                  <span>Server Version</span>
+                </div>
+                <span className="settings-value-text">{serverVersion}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Reset */}
           <div className="settings-section">
             <button
               className="btn btn-secondary"
