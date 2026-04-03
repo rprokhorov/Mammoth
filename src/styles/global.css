@@ -69,7 +69,74 @@ body {
   align-items: center;
   justify-content: center;
   height: 100vh;
-  gap: 16px;
+  gap: 12px;
+  background: var(--bg-primary);
+}
+.app-loading-logo {
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  background: #1e73be;
+  color: #fff;
+  font-size: 28px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 4px;
+}
+.app-loading-text {
+  color: var(--text-muted);
+  font-size: 14px;
+  margin: 0;
+}
+
+/* Error screen */
+.error-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  padding: 32px;
+  gap: 12px;
+  background: var(--bg-primary);
+  text-align: center;
+}
+.error-screen-icon {
+  font-size: 48px;
+}
+.error-screen-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+.error-screen-message {
+  font-size: 13px;
+  color: #ff6b6b;
+  background: rgba(255, 107, 107, 0.1);
+  border: 1px solid rgba(255, 107, 107, 0.2);
+  border-radius: 8px;
+  padding: 12px 16px;
+  max-width: 480px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  text-align: left;
+}
+.error-screen-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+.error-screen-stack {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-width: 560px;
+  text-align: left;
+  margin-top: 8px;
 }
 
 .centered-content {

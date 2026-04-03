@@ -28,26 +28,47 @@ const CreateChannelModal = lazy(() => import("@/components/channel/CreateChannel
 // Error boundary to catch and display React errors instead of blank screen
 class ErrorBoundary extends Component<
   { children: ReactNode },
-  { error: Error | null }
+  { error: Error | null; clearing: boolean }
 > {
-  state = { error: null as Error | null };
+  state = { error: null as Error | null, clearing: false };
   static getDerivedStateFromError(error: Error) {
     return { error };
+  }
+  async handleClearAndReload() {
+    this.setState({ clearing: true });
+    try {
+      await invoke("clear_app_cache");
+    } catch { /* ignore */ }
+    window.location.reload();
   }
   render() {
     if (this.state.error) {
       return (
-        <div style={{ padding: 32, color: "#ff4444", fontFamily: "monospace" }}>
-          <h2>Application Error</h2>
-          <pre style={{ whiteSpace: "pre-wrap" }}>
+        <div className="error-screen">
+          <div className="error-screen-icon">⚠️</div>
+          <h2 className="error-screen-title">Something went wrong</h2>
+          <pre className="error-screen-message">
             {this.state.error.message}
           </pre>
-          <pre style={{ whiteSpace: "pre-wrap", fontSize: 12, opacity: 0.7 }}>
-            {this.state.error.stack}
-          </pre>
-          <button onClick={() => this.setState({ error: null })}>
-            Try again
-          </button>
+          <div className="error-screen-actions">
+            <button
+              className="btn btn-primary"
+              onClick={() => this.setState({ error: null })}
+            >
+              Try Again
+            </button>
+            <button
+              className="btn btn-secondary"
+              onClick={() => this.handleClearAndReload()}
+              disabled={this.state.clearing}
+            >
+              {this.state.clearing ? "Clearing…" : "Clear Cache & Reload"}
+            </button>
+          </div>
+          <details style={{ marginTop: 16, opacity: 0.5 }}>
+            <summary style={{ cursor: "pointer", fontSize: 12 }}>Stack trace</summary>
+            <pre className="error-screen-stack">{this.state.error.stack}</pre>
+          </details>
         </div>
       );
     }
@@ -467,10 +488,23 @@ function AppContent() {
   if (loading) {
     return (
       <div className="app-loading">
+        <div className="app-loading-logo">M</div>
         <div className="spinner" />
-        <p>Loading...</p>
+        <p className="app-loading-text">
+          {initError ? initError : "Connecting…"}
+        </p>
         {initError && (
-          <p style={{ color: "#ff4444", fontSize: 12 }}>{initError}</p>
+          <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+            <button className="btn btn-primary" onClick={() => window.location.reload()}>
+              Reload
+            </button>
+            <button className="btn btn-secondary" onClick={async () => {
+              await invoke("clear_app_cache").catch(() => {});
+              window.location.reload();
+            }}>
+              Clear Cache & Reload
+            </button>
+          </div>
         )}
       </div>
     );
