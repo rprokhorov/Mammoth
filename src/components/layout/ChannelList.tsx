@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { useUiStore, type ChannelInfo, type SidebarCategory } from "@/stores/uiStore";
 import { useThreadsStore } from "@/stores/threadsStore";
 import { useTabsStore } from "@/stores/tabsStore";
+import { UserAvatar } from "@/components/common/UserAvatar";
 
 interface ChannelListProps {
   onSelectChannel: (channelId: string) => void;
@@ -358,7 +359,16 @@ export function ChannelList({ onSelectChannel, onCreateChannel, serverId, curren
   favoriteList.sort((a, b) => a.display_name.localeCompare(b.display_name));
   dmChannels.sort((a, b) => b.last_post_at - a.last_post_at);
 
+  function getDmUserId(ch: ChannelInfo): string | null {
+    if (ch.channel_type !== "D") return null;
+    const parts = ch.name.split("__");
+    return parts.find((p) => p !== currentUserId) ?? parts[0] ?? null;
+  }
+
   function renderChannel(ch: ChannelInfo) {
+    const dmUserId = getDmUserId(ch);
+    const dmUser = dmUserId ? users[dmUserId] : null;
+
     return (
       <button
         key={ch.id}
@@ -381,7 +391,17 @@ export function ChannelList({ onSelectChannel, onCreateChannel, serverId, curren
         }}
         onContextMenu={(e) => handleContextMenu(e, ch.id)}
       >
-        <span className="channel-prefix">{getPrefix(ch)}</span>
+        {dmUserId ? (
+          <span className="channel-prefix channel-dm-avatar">
+            <UserAvatar
+              userId={dmUserId}
+              username={dmUser?.username || dmUserId}
+              size={18}
+            />
+          </span>
+        ) : (
+          <span className="channel-prefix">{getPrefix(ch)}</span>
+        )}
         <span className="channel-name">{getDisplayName(ch)}</span>
         {ch.mention_count > 0 && (
           <span className="mention-badge">{ch.mention_count}</span>

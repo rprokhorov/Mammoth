@@ -932,6 +932,14 @@ button.secondary:hover:not(:disabled) {
   margin-top: 2px;
 }
 
+.channel-dm-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+}
+
 .user-avatar-placeholder {
   border-radius: 50%;
   background: var(--bg-tertiary);
