@@ -91,7 +91,11 @@ export function ReactionsBar({
   function getTooltip(group: GroupedReaction): string {
     const names = group.userIds
       .slice(0, 5)
-      .map((uid) => users[uid]?.username || uid.slice(0, 8));
+      .map((uid) => {
+        const u = users[uid];
+        if (!u) return uid.slice(0, 8);
+        return u.nickname || `${u.first_name} ${u.last_name}`.trim() || u.username;
+      });
     const remaining = group.userIds.length - 5;
     let tooltip = names.join(", ");
     if (remaining > 0) tooltip += ` and ${remaining} more`;
