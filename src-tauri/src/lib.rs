@@ -117,6 +117,7 @@ pub fn run() {
             commands::get_image_thumbnail,
             commands::get_custom_emojis,
             commands::get_custom_emoji_image,
+            commands::get_user_avatar,
             commands::read_local_file_as_data_url,
             commands::save_temp_file,
             commands::download_file,

@@ -6,6 +6,7 @@ import { useThreadsStore } from "@/stores/threadsStore";
 import { useMessagesStore, type PostData } from "@/stores/messagesStore";
 import { CustomEmojiRenderer } from "./CustomEmojiRenderer";
 import { PresenceDot } from "./PresenceDot";
+import { UserAvatar } from "@/components/common/UserAvatar";
 import { FileAttachment } from "./FileAttachment";
 import { UserPopover } from "@/components/user/UserPopover";
 import { ReactionsBar } from "./ReactionsBar";
@@ -47,7 +48,7 @@ export const MessageItem = memo(function MessageItem({
     : post.user_id.slice(0, 8);
 
   const username = user?.username ?? post.user_id.slice(0, 8);
-  const initials = displayName.charAt(0).toUpperCase();
+
   const isOwn = post.user_id === currentUserId;
   const isEdited = post.edit_at > 0;
   const isSystem = post.post_type !== "" && post.post_type !== undefined;
@@ -137,8 +138,9 @@ export const MessageItem = memo(function MessageItem({
           title={username}
           ref={avatarRef}
           onClick={() => setShowPopover(true)}
+          style={{ position: "relative", overflow: "visible", background: "none", padding: 0 }}
         >
-          {initials}
+          <UserAvatar userId={post.user_id} username={user?.username || post.user_id} size={36} />
           <PresenceDot userId={post.user_id} />
         </div>
       ) : (

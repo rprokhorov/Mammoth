@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
+import { UserAvatar } from "@/components/common/UserAvatar";
+import { clearUserAvatarCache } from "@/hooks/useUserAvatar";
 
 interface ProfileData {
   id: string;
@@ -80,9 +82,8 @@ export function ProfileModal({ serverId, userId, onClose }: ProfileModalProps) {
 
       const path = typeof selected === "string" ? selected : String(selected);
       await invoke("upload_avatar", { serverId, filePath: path });
-      // Refresh profile to get new avatar
-      const p = await invoke<ProfileData>("get_user_profile", { serverId, userId });
-      setProfile(p);
+      // Invalidate avatar cache so UserAvatar re-fetches
+      clearUserAvatarCache(serverId, userId);
       setMessage("Avatar updated");
     } catch (e) {
       setMessage(`Error uploading avatar: ${e}`);
@@ -106,11 +107,7 @@ export function ProfileModal({ serverId, userId, onClose }: ProfileModalProps) {
         ) : profile ? (
           <div className="profile-form">
             <div className="profile-avatar-section">
-              <img
-                src={profile.avatar_url}
-                alt={profile.username}
-                className="profile-avatar-large"
-              />
+              <UserAvatar userId={profile.id} username={profile.username} size={80} className="profile-avatar-large" />
               <button
                 className="btn btn-secondary"
                 onClick={handleUploadAvatar}

@@ -191,6 +191,37 @@ pub async fn get_custom_emoji_image(
     Ok(ImageDataResult { data_url: format!("data:{};base64,{}", mime, encoded) })
 }
 
+/// Downloads a user's profile image and returns it as a base64 data URL.
+#[tauri::command]
+pub async fn get_user_avatar(
+    state: State<'_, AppState>,
+    server_id: String,
+    user_id: String,
+) -> Result<ImageDataResult, AppError> {
+    let client = {
+        let servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let server = servers
+            .get(&server_id)
+            .ok_or_else(|| AppError::NotFound(format!("Server {} not found", server_id)))?;
+        server.client.clone()
+    };
+
+    let bytes = client.download_user_avatar(&user_id).await?;
+
+    let mime = if bytes.starts_with(b"\x89PNG") {
+        "image/png"
+    } else if bytes.starts_with(b"\xFF\xD8") {
+        "image/jpeg"
+    } else if bytes.starts_with(b"GIF") {
+        "image/gif"
+    } else {
+        "image/png"
+    };
+    use base64::Engine;
+    let encoded = base64::engine::general_purpose::STANDARD.encode(&bytes);
+    Ok(ImageDataResult { data_url: format!("data:{};base64,{}", mime, encoded) })
+}
+
 /// Reads a local file and returns it as a base64 data URL.
 /// Used for preview of locally-attached files before upload, and for clipboard images.
 #[tauri::command]

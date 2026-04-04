@@ -932,6 +932,17 @@ button.secondary:hover:not(:disabled) {
   margin-top: 2px;
 }
 
+.user-avatar-placeholder {
+  border-radius: 50%;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
 .message-gutter {
   width: 36px;
   flex-shrink: 0;

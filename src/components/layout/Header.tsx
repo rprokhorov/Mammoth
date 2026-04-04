@@ -1,6 +1,7 @@
 import { useState, useRef } from "react";
 import { useUiStore } from "@/stores/uiStore";
 import { PresenceDot } from "@/components/message/PresenceDot";
+import { UserAvatar } from "@/components/common/UserAvatar";
 import { StatusPicker } from "@/components/user/StatusPicker";
 
 interface HeaderProps {
@@ -84,9 +85,10 @@ export function Header({
           onClick={() => setShowUserMenu((v) => !v)}
           title={activeServer?.username || "User menu"}
         >
-          <span className="header-user-avatar">
-            {(activeServer?.username || "?").charAt(0).toUpperCase()}
-          </span>
+          {currentUserId
+            ? <UserAvatar userId={currentUserId} username={activeServer?.username || "?"} size={32} />
+            : <span className="header-user-avatar">{(activeServer?.username || "?").charAt(0).toUpperCase()}</span>
+          }
           {currentUserId && <PresenceDot userId={currentUserId} />}
         </button>
 
