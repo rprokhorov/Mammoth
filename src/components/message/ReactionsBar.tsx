@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { useState, memo } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import type { ReactionData } from "@/stores/messagesStore";
 import { useUiStore } from "@/stores/uiStore";
+import { useCustomEmojiStore } from "@/stores/customEmojiStore";
+import { useCustomEmojiImage } from "@/hooks/useCustomEmojiImage";
 import { emojiNameToUnicode } from "./EmojiPicker";
 
 interface ReactionsBarProps {
@@ -11,6 +13,26 @@ interface ReactionsBarProps {
   currentUserId: string | null;
   onReactionsChange: () => void;
 }
+
+// Renders a single emoji — custom (img) or standard (unicode)
+const ReactionEmoji = memo(function ReactionEmoji({ name }: { name: string }) {
+  const emojiId = useCustomEmojiStore((s) => s.emojis.find((e) => e.name === name)?.id ?? null);
+  const imgUrl = useCustomEmojiImage(emojiId);
+
+  if (emojiId) {
+    if (!imgUrl) return <span style={{ fontSize: "1em" }}>…</span>;
+    return (
+      <img
+        src={imgUrl}
+        alt={`:${name}:`}
+        style={{ height: "1.1em", width: "auto", verticalAlign: "middle" }}
+      />
+    );
+  }
+
+  const unicode = emojiNameToUnicode(name);
+  return <span>{unicode.startsWith(":") ? name : unicode}</span>;
+});
 
 interface GroupedReaction {
   emoji_name: string;
@@ -87,7 +109,7 @@ export function ReactionsBar({
           disabled={toggling === group.emoji_name}
         >
           <span className="reaction-emoji">
-            {emojiNameToUnicode(group.emoji_name)}
+            <ReactionEmoji name={group.emoji_name} />
           </span>
           <span className="reaction-count">{group.count}</span>
         </button>

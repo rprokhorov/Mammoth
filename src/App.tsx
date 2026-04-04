@@ -240,7 +240,20 @@ function AppContent() {
 
       // Try to validate saved session
       try {
-        const valid = await invoke<boolean>("validate_session", { serverId: targetId });
+        let valid: boolean;
+        try {
+          valid = await invoke<boolean>("validate_session", { serverId: targetId });
+        } catch (e) {
+          const msg = String(e).toLowerCase();
+          const isNetwork = msg.includes("network") || msg.includes("connection") || msg.includes("timeout") || msg.includes("connect");
+          if (isNetwork) {
+            // Server unreachable — keep token, go to main with offline indicator
+            console.warn("Server unreachable at startup, proceeding offline:", e);
+            store.setCurrentView("main");
+            return;
+          }
+          throw e;
+        }
         if (!valid) {
           store.setCurrentView("login");
           return;
