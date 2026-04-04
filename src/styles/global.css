@@ -670,6 +670,17 @@ button.secondary:hover:not(:disabled) {
   font-weight: 600;
 }
 
+.channel-item.dragging {
+  opacity: 0.4;
+  cursor: grabbing;
+}
+
+.channel-group.drag-over {
+  background: rgba(35, 137, 215, 0.1);
+  border-radius: 4px;
+  outline: 1px dashed var(--accent);
+}
+
 .channel-prefix {
   color: var(--text-muted);
   font-size: 13px;
@@ -1204,7 +1215,7 @@ button.secondary:hover:not(:disabled) {
   resize: none;
   outline: none;
   min-height: 40px;
-  max-height: 126px;
+  max-height: 440px;
   overflow-y: hidden;
   overflow-x: hidden;
   transition: border-color 0.15s;

@@ -48,6 +48,10 @@ export function ChannelList({ onSelectChannel, onCreateChannel, serverId, curren
   // Collapsed categories
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
 
+  // Drag-and-drop state
+  const [dragChannelId, setDragChannelId] = useState<string | null>(null);
+  const [dragOverCategoryId, setDragOverCategoryId] = useState<string | null>(null);
+
   useEffect(() => {
     if (renamingCategoryId && renameInputRef.current) {
       renameInputRef.current.focus();
@@ -358,7 +362,16 @@ export function ChannelList({ onSelectChannel, onCreateChannel, serverId, curren
     return (
       <button
         key={ch.id}
-        className={`channel-item ${activeChannelId === ch.id ? "active" : ""} ${isUnread(ch) ? "unread" : ""}`}
+        className={`channel-item ${activeChannelId === ch.id ? "active" : ""} ${isUnread(ch) ? "unread" : ""} ${dragChannelId === ch.id ? "dragging" : ""}`}
+        draggable
+        onDragStart={(e) => {
+          e.dataTransfer.effectAllowed = "move";
+          setDragChannelId(ch.id);
+        }}
+        onDragEnd={() => {
+          setDragChannelId(null);
+          setDragOverCategoryId(null);
+        }}
         onClick={() => onSelectChannel(ch.id)}
         onAuxClick={(e) => {
           if (e.button === 1) {
@@ -475,7 +488,30 @@ export function ChannelList({ onSelectChannel, onCreateChannel, serverId, curren
               const isCollapsed = collapsedCategories.has(cat.id);
 
               return (
-                <div key={cat.id} className="channel-group">
+                <div
+                  key={cat.id}
+                  className={`channel-group ${dragOverCategoryId === cat.id ? "drag-over" : ""}`}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = "move";
+                    setDragOverCategoryId(cat.id);
+                  }}
+                  onDragLeave={(e) => {
+                    // Only clear if leaving the group entirely (not entering a child)
+                    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                      setDragOverCategoryId(null);
+                    }
+                  }}
+                  onDrop={async (e) => {
+                    e.preventDefault();
+                    const channelId = dragChannelId;
+                    setDragOverCategoryId(null);
+                    setDragChannelId(null);
+                    if (channelId) {
+                      await handleMoveToCategory(channelId, cat.id);
+                    }
+                  }}
+                >
                   {renderCategoryHeader(cat)}
                   {!isCollapsed && catChannels.map(renderChannel)}
                 </div>

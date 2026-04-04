@@ -179,7 +179,7 @@ export function ThreadPanel({ serverId, currentUserId, width }: ThreadPanelProps
     const ta = textareaRef.current;
     if (ta) {
       ta.style.height = "auto";
-      ta.style.height = Math.min(ta.scrollHeight, 126) + "px";
+      ta.style.height = Math.min(ta.scrollHeight, 440) + "px";
     }
   }
 
