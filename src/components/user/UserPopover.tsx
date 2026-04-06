@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useUiStore } from "@/stores/uiStore";
 import { PresenceDot } from "@/components/message/PresenceDot";
+import { UserAvatar } from "@/components/common/UserAvatar";
+import { MarkdownRenderer } from "@/components/message/MarkdownRenderer";
 
 interface UserProfile {
   id: string;
@@ -14,6 +16,8 @@ interface UserProfile {
   roles: string;
   locale: string;
   avatar_url: string;
+  last_activity_at: number;
+  props: Record<string, string> | null;
 }
 
 interface UserPopoverProps {
@@ -21,6 +25,20 @@ interface UserPopoverProps {
   serverId: string;
   anchorEl: HTMLElement | null;
   onClose: () => void;
+}
+
+function formatLastSeen(ts: number): string {
+  if (!ts) return "";
+  const now = Date.now();
+  const diff = now - ts;
+  const minutes = Math.floor(diff / 60000);
+  if (minutes < 2) return "just now";
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days}d ago`;
+  return new Date(ts).toLocaleDateString();
 }
 
 export function UserPopover({
@@ -36,7 +54,7 @@ export function UserPopover({
 
   useEffect(() => {
     invoke<UserProfile>("get_user_profile", { serverId, userId })
-      .then(setProfile)
+      .then((p) => { console.log("user props:", JSON.stringify(p.props, null, 2)); setProfile(p); })
       .catch(console.error)
       .finally(() => setLoading(false));
   }, [userId, serverId]);
@@ -78,6 +96,20 @@ export function UserPopover({
     .join(" ");
   const isAdmin = profile?.roles?.includes("system_admin");
 
+  // Extract custom attributes from props (keys starting with "customAttribute" or any non-system key)
+  const customAttrs: Array<{ key: string; value: string }> = [];
+  if (profile?.props) {
+    for (const [k, v] of Object.entries(profile.props)) {
+      if (typeof v === "string" && v.trim()) {
+        customAttrs.push({ key: k, value: v });
+      }
+    }
+  }
+
+  const lastSeenText = profile?.last_activity_at
+    ? formatLastSeen(profile.last_activity_at)
+    : "";
+
   return (
     <div className="user-popover" ref={popoverRef} style={style}>
       {loading ? (
@@ -88,7 +120,7 @@ export function UserPopover({
         <>
           <div className="user-popover-header">
             <div className="user-popover-avatar">
-              <img src={profile.avatar_url} alt={profile.username} />
+              <UserAvatar userId={profile.id} username={profile.username} size={56} />
               <PresenceDot userId={userId} />
             </div>
             <div className="user-popover-names">
@@ -118,7 +150,15 @@ export function UserPopover({
             <div className="user-popover-row">
               <span className="user-popover-label">Status</span>
               <span className="user-popover-status">{status}</span>
+              {status === "offline" && lastSeenText && (
+                <span className="user-popover-last-seen"> · {lastSeenText}</span>
+              )}
             </div>
+            {customAttrs.map(({ key, value }) => (
+              <div key={key} className="user-popover-custom-attr">
+                <MarkdownRenderer text={value} />
+              </div>
+            ))}
           </div>
         </>
       ) : (

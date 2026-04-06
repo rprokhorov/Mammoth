@@ -278,6 +278,14 @@ impl MattermostClient {
         Ok(user)
     }
 
+    pub async fn get_user_raw(&self, user_id: &str) -> Result<serde_json::Value, AppError> {
+        let resp = self
+            .get_authenticated(&format!("/users/{}", user_id))
+            .await?;
+        let val: serde_json::Value = resp.json().await?;
+        Ok(val)
+    }
+
     pub async fn get_users_by_ids(&self, user_ids: &[String]) -> Result<Vec<User>, AppError> {
         let auth = self.auth_header()?;
         let resp = self

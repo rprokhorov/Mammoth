@@ -283,8 +283,15 @@ function AppContent() {
         store.setCurrentView("main");
       } catch (e) {
         console.error("Session restore failed:", e);
-        setInitError(String(e));
-        store.setCurrentView("login");
+        const msg = String(e).toLowerCase();
+        const isNetwork = msg.includes("network") || msg.includes("connection") || msg.includes("timeout") || msg.includes("connect") || msg.includes("os error");
+        if (isNetwork) {
+          console.warn("Network error during session restore, proceeding offline");
+          store.setCurrentView("main");
+        } else {
+          setInitError(String(e));
+          store.setCurrentView("login");
+        }
       }
     } catch (e) {
       console.error("Failed to load servers:", e);
@@ -333,7 +340,8 @@ function AppContent() {
     store.setCurrentView("main");
   }
 
-  async function loadCustomEmojis(serverId: string) {
+  async function loadCustomEmojis(serverId: string, force = false) {
+    if (!force && useCustomEmojiStore.getState().isFresh()) return;
     try {
       const list = await invoke<CustomEmoji[]>("get_custom_emojis", { serverId });
       useCustomEmojiStore.getState().setEmojis(list);

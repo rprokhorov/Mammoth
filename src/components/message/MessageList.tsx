@@ -41,6 +41,7 @@ export function MessageList({
   const [hasMore, setHasMore] = useState(true);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [isNearBottom, setIsNearBottom] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const shouldPinToBottom = useRef(false);
 
   const orderByChannel = useMessagesStore((s) => s.orderByChannel);
@@ -54,6 +55,7 @@ export function MessageList({
     const { setLoading, setChannelPosts } = getMessagesActions();
     setLoading(true);
     setHasMore(true);
+    setLoadError(null);
 
     invoke<PostsResponse>("get_posts", {
       serverId,
@@ -65,14 +67,19 @@ export function MessageList({
         if (cancelled) return;
         setChannelPosts(channelId, res.order, res.posts);
         if (res.order.length < POSTS_PER_PAGE) setHasMore(false);
-        // Pin to bottom while content (images etc.) is still loading
         shouldPinToBottom.current = true;
         bottomRef.current?.scrollIntoView();
-        // Stop pinning after 2s — enough for images to load
         setTimeout(() => { shouldPinToBottom.current = false; }, 2000);
       })
       .catch((e) => {
-        if (!cancelled) console.error("Failed to load posts:", e);
+        if (cancelled) return;
+        console.error("Failed to load posts:", e);
+        const msg = String(e).toLowerCase();
+        if (msg.includes("timed out") || msg.includes("network") || msg.includes("connect")) {
+          setLoadError("Не удалось загрузить сообщения — нет соединения с сервером");
+        } else {
+          setLoadError("Не удалось загрузить сообщения");
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -264,6 +271,28 @@ export function MessageList({
     return (
       <div className="message-list-loading">
         <div className="spinner" />
+      </div>
+    );
+  }
+
+  if (loadError && order.length === 0) {
+    return (
+      <div className="message-list-loading" style={{ flexDirection: "column", gap: 12 }}>
+        <span style={{ color: "var(--error)", fontSize: 14 }}>{loadError}</span>
+        <button
+          className="btn btn-secondary"
+          onClick={() => {
+            setLoadError(null);
+            const { setLoading, setChannelPosts } = getMessagesActions();
+            setLoading(true);
+            invoke<PostsResponse>("get_posts", { serverId, channelId, page: 0, perPage: POSTS_PER_PAGE })
+              .then((res) => { setChannelPosts(channelId, res.order, res.posts); })
+              .catch(() => setLoadError("Не удалось загрузить сообщения"))
+              .finally(() => setLoading(false));
+          }}
+        >
+          Повторить
+        </button>
       </div>
     );
   }
