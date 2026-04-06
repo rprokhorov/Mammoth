@@ -47,14 +47,35 @@ export function UserPopover({
   anchorEl,
   onClose,
 }: UserPopoverProps) {
-  const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [loading, setLoading] = useState(true);
-  const popoverRef = useRef<HTMLDivElement>(null);
+  const cachedUser = useUiStore((s) => s.users[userId] ?? null);
   const status = useUiStore((s) => s.userStatuses[userId] || "offline");
+  const popoverRef = useRef<HTMLDivElement>(null);
+
+  // Start with cached data immediately (no loading state shown)
+  const [profile, setProfile] = useState<UserProfile | null>(
+    cachedUser
+      ? {
+          id: cachedUser.id,
+          username: cachedUser.username,
+          email: cachedUser.email,
+          first_name: cachedUser.first_name,
+          last_name: cachedUser.last_name,
+          nickname: cachedUser.nickname,
+          position: "",
+          roles: "",
+          locale: "",
+          avatar_url: "",
+          last_activity_at: 0,
+          props: null,
+        }
+      : null,
+  );
+  const [loading, setLoading] = useState(!cachedUser);
 
   useEffect(() => {
+    // Always fetch full profile in background to get position, roles, props, last_activity_at
     invoke<UserProfile>("get_user_profile", { serverId, userId })
-      .then((p) => { console.log("user props:", JSON.stringify(p.props, null, 2)); setProfile(p); })
+      .then((p) => setProfile(p))
       .catch(console.error)
       .finally(() => setLoading(false));
   }, [userId, serverId]);
@@ -112,7 +133,7 @@ export function UserPopover({
 
   return (
     <div className="user-popover" ref={popoverRef} style={style}>
-      {loading ? (
+      {loading && !profile ? (
         <div className="user-popover-loading">
           <div className="spinner small" />
         </div>
