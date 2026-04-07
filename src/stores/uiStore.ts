@@ -63,6 +63,10 @@ interface UiState {
   channels: ChannelInfo[];
   activeChannelId: string | null;
 
+  // Current logged-in user id
+  currentUserId: string | null;
+  setCurrentUserId: (id: string | null) => void;
+
   // Users cache
   users: Record<string, UserInfo>;
 
@@ -138,6 +142,9 @@ export const useUiStore = create<UiState>((set) => ({
   activeTeamId: null,
   channels: [],
   activeChannelId: null,
+
+  currentUserId: null,
+  setCurrentUserId: (id) => set({ currentUserId: id }),
 
   users: {},
   userStatuses: {},

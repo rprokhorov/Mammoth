@@ -1399,6 +1399,52 @@ impl MattermostClient {
         Ok(bytes.to_vec())
     }
 
+    /// Create or get existing DM channel between two users
+    pub async fn create_direct_channel(
+        &self,
+        user_id_1: &str,
+        user_id_2: &str,
+    ) -> Result<Channel, AppError> {
+        let auth = self.auth_header()?;
+        let body = serde_json::json!([user_id_1, user_id_2]);
+        let resp = self
+            .http
+            .post(self.api_url("/channels/direct"))
+            .header(header::AUTHORIZATION, &auth)
+            .json(&body)
+            .send()
+            .await?;
+        if !resp.status().is_success() {
+            let status = resp.status().as_u16();
+            let msg = resp.text().await.unwrap_or_default();
+            return Err(AppError::Api { status, message: msg });
+        }
+        Ok(resp.json().await?)
+    }
+
+    /// Search channels by term (public channels in team)
+    pub async fn search_channels(
+        &self,
+        team_id: &str,
+        term: &str,
+    ) -> Result<Vec<Channel>, AppError> {
+        let auth = self.auth_header()?;
+        let body = serde_json::json!({ "term": term });
+        let resp = self
+            .http
+            .post(self.api_url(&format!("/teams/{}/channels/search", team_id)))
+            .header(header::AUTHORIZATION, &auth)
+            .json(&body)
+            .send()
+            .await?;
+        if !resp.status().is_success() {
+            let status = resp.status().as_u16();
+            let msg = resp.text().await.unwrap_or_default();
+            return Err(AppError::Api { status, message: msg });
+        }
+        Ok(resp.json().await?)
+    }
+
     /// Get WebSocket URL for this server
     pub fn websocket_url(&self) -> Result<String, AppError> {
         let base = self.base_url.as_str();

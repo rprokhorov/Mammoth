@@ -106,3 +106,64 @@ pub async fn leave_channel(
 
     client.leave_channel(&channel_id, &user_id).await
 }
+
+/// Create (or get existing) DM channel with another user. Returns the channel.
+#[tauri::command]
+pub async fn create_direct_channel(
+    state: State<'_, AppState>,
+    server_id: String,
+    other_user_id: String,
+) -> Result<Channel, AppError> {
+    let (client, my_user_id) = {
+        let servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let server = servers
+            .get(&server_id)
+            .ok_or_else(|| AppError::NotFound("Server not found".into()))?;
+        let uid = server
+            .current_user
+            .as_ref()
+            .map(|u| u.id.clone())
+            .ok_or_else(|| AppError::Auth("Not logged in".into()))?;
+        (server.client.clone(), uid)
+    };
+
+    client.create_direct_channel(&my_user_id, &other_user_id).await
+}
+
+/// Search public/private channels in team by term
+#[tauri::command]
+pub async fn search_channels(
+    state: State<'_, AppState>,
+    server_id: String,
+    team_id: String,
+    term: String,
+) -> Result<Vec<Channel>, AppError> {
+    let client = {
+        let servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let server = servers
+            .get(&server_id)
+            .ok_or_else(|| AppError::NotFound("Server not found".into()))?;
+        server.client.clone()
+    };
+
+    client.search_channels(&team_id, &term).await
+}
+
+/// Add a user to a channel
+#[tauri::command]
+pub async fn add_user_to_channel(
+    state: State<'_, AppState>,
+    server_id: String,
+    channel_id: String,
+    user_id: String,
+) -> Result<(), AppError> {
+    let client = {
+        let servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let server = servers
+            .get(&server_id)
+            .ok_or_else(|| AppError::NotFound("Server not found".into()))?;
+        server.client.clone()
+    };
+
+    client.add_channel_member(&channel_id, &user_id).await
+}

@@ -276,6 +276,7 @@ function AppContent() {
         // Session is valid — load user, connect WS, load data
         const me = await invoke<{ id: string; username: string }>("get_me", { serverId: targetId });
         setCurrentUserId(me.id);
+        store.setCurrentUserId(me.id);
         store.setServers(mapped.map((s) =>
           s.id === targetId ? { ...s, connected: true, username: me.username } : s,
         ));
@@ -330,6 +331,7 @@ function AppContent() {
     if (!serverId) return;
 
     setCurrentUserId(userId);
+    store.setCurrentUserId(userId);
     store.updateServer(serverId, { connected: true, username });
 
     // Connect WebSocket

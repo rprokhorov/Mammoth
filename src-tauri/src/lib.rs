@@ -128,6 +128,9 @@ pub fn run() {
             commands::update_channel,
             commands::archive_channel,
             commands::leave_channel,
+            commands::create_direct_channel,
+            commands::search_channels,
+            commands::add_user_to_channel,
             // Reactions & Pins
             commands::add_reaction,
             commands::remove_reaction,
