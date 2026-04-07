@@ -31,14 +31,14 @@ export const CustomEmojiRenderer = memo(function CustomEmojiRenderer({ text }: P
   // Build a name→id map for quick lookup
   const emojiMap = useMemo(() => {
     const m = new Map<string, string>();
-    for (const e of emojis) m.set(e.name, e.id);
+    for (const e of emojis) m.set(e.name.toLowerCase(), e.id);
     return m;
   }, [emojis]);
 
   // Check if text contains any custom emoji — if not, skip splitting
   const hasCustom = useMemo(() => {
     if (emojiMap.size === 0) return false;
-    return /:([a-z0-9_-]+):/i.test(text);
+    return /:([a-z0-9_+-]+):/i.test(text);
   }, [text, emojiMap]);
 
   if (!hasCustom) {
@@ -49,7 +49,7 @@ export const CustomEmojiRenderer = memo(function CustomEmojiRenderer({ text }: P
   const parts: React.ReactNode[] = [];
   let key = 0;
 
-  const emojiRegex = /:([a-z0-9_-]+):/gi;
+  const emojiRegex = /:([a-z0-9_+-]+):/gi;
   let lastIndex = 0;
   let match: RegExpExecArray | null;
 

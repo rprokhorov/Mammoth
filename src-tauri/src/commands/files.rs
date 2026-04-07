@@ -156,8 +156,10 @@ pub async fn get_custom_emojis(
                 all.push(CustomEmoji { id, name });
             }
         }
-        if len < per_page as usize { break; }
+        if len == 0 { break; }
         page += 1;
+        // Safety cap to avoid infinite loop
+        if page > 200 { break; }
     }
     Ok(all)
 }
