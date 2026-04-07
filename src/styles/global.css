@@ -1967,8 +1967,9 @@ button.secondary:hover:not(:disabled) {
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 16px;
-  min-width: 260px;
+  width: 280px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  overflow: hidden;
 }
 .user-popover-loading {
   display: flex;
@@ -2036,16 +2037,21 @@ button.secondary:hover:not(:disabled) {
 }
 
 .user-popover-custom-attr {
-  padding: 4px 0;
+  padding-top: 8px;
+  margin-top: 4px;
   font-size: 13px;
   color: var(--text-secondary);
   border-top: 1px solid var(--border);
-  margin-top: 4px;
-  padding-top: 8px;
+  word-break: break-word;
+  white-space: normal;
 }
 
 .user-popover-custom-attr p {
-  margin: 0;
+  margin: 0 0 4px 0;
+}
+
+.user-popover-custom-attr p:last-child {
+  margin-bottom: 0;
 }
 .user-popover-badge {
   background: var(--accent);

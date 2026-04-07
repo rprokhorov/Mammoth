@@ -18,25 +18,23 @@ pub async fn get_user_profile(
         (server.client.clone(), token)
     };
 
-    let (user, raw) = tokio::join!(
+    let status_ids = vec![user_id.clone()];
+    let (user_res, status_res, custom_attrs) = tokio::join!(
         client.get_user(&user_id),
-        client.get_user_raw(&user_id),
+        client.get_user_statuses_by_ids(&status_ids),
+        client.get_custom_attributes(&user_id),
     );
-    let user = user?;
-    let raw = raw.unwrap_or(serde_json::Value::Null);
-    let props = raw.get("props").cloned().unwrap_or(serde_json::Value::Null);
-    eprintln!("[profile] props = {}", serde_json::to_string_pretty(&props).unwrap_or_default());
+    let user = user_res?;
 
     let avatar_url = format!("{}?_t={}", client.profile_image_url(&user_id), token);
 
-    // Fetch status to get last_activity_at (best-effort)
-    let last_activity_at = client
-        .get_user_statuses_by_ids(&[user_id.clone()])
-        .await
+    let last_activity_at = status_res
         .ok()
         .and_then(|mut v| v.pop())
         .map(|s| s.last_activity_at)
         .unwrap_or(0);
+
+    let attrs: Vec<String> = custom_attrs.unwrap_or_default();
 
     Ok(serde_json::json!({
         "id": user.id,
@@ -50,7 +48,7 @@ pub async fn get_user_profile(
         "locale": user.locale,
         "avatar_url": avatar_url,
         "last_activity_at": last_activity_at,
-        "props": props,
+        "custom_attributes": attrs,
     }))
 }
 

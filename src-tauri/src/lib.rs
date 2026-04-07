@@ -159,6 +159,7 @@ pub fn run() {
             // Server utils
             commands::get_server_version,
             commands::clear_app_cache,
+            commands::open_url,
             // Tray / Badge
             set_badge_count,
         ])

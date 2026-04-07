@@ -1,5 +1,6 @@
 import { marked, Renderer } from "marked";
 import { useMemo } from "react";
+import { emojiNameToUnicode } from "./EmojiPicker";
 
 interface MarkdownRendererProps {
   text: string;
@@ -29,11 +30,14 @@ renderer.codespan = ({ text }) => {
 marked.setOptions({ renderer, gfm: true, breaks: true });
 
 function renderMarkdown(text: string): string {
-  // Pre-process @mentions and ~channel links before markdown parsing
-  // (marked would otherwise alter them)
   let processed = text
     .replace(/@(\w+)/g, '<span class="mention">@$1</span>')
-    .replace(/~([\w-]+)/g, '<span class="channel-link">~$1</span>');
+    .replace(/~([\w-]+)/g, '<span class="channel-link">~$1</span>')
+    // Replace :emoji_name: with unicode — skip if it looks like a custom emoji (no mapping)
+    .replace(/:([a-z0-9_+-]+):/gi, (match, name) => {
+      const unicode = emojiNameToUnicode(name);
+      return unicode.startsWith(":") ? match : unicode;
+    });
 
   return marked.parse(processed) as string;
 }

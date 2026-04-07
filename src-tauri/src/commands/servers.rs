@@ -236,6 +236,17 @@ pub async fn get_server_version(
 /// Clears all in-memory caches (images, etc.). The frontend Zustand stores
 /// are reset via a page reload triggered after this command.
 #[tauri::command]
+pub async fn open_url(url: String) -> Result<(), AppError> {
+    #[cfg(target_os = "macos")]
+    std::process::Command::new("open").arg(&url).spawn().ok();
+    #[cfg(target_os = "windows")]
+    std::process::Command::new("cmd").args(["/c", "start", &url]).spawn().ok();
+    #[cfg(target_os = "linux")]
+    std::process::Command::new("xdg-open").arg(&url).spawn().ok();
+    Ok(())
+}
+
+#[tauri::command]
 pub async fn clear_app_cache(
     app_handle: tauri::AppHandle,
 ) -> Result<(), AppError> {

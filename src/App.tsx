@@ -141,6 +141,20 @@ function AppContent() {
     loadServers();
   }, []);
 
+  // Intercept all link clicks and open in system browser
+  useEffect(() => {
+    function handleLinkClick(e: MouseEvent) {
+      const target = (e.target as HTMLElement).closest("a");
+      if (!target) return;
+      const href = target.getAttribute("href");
+      if (!href || href.startsWith("#")) return;
+      e.preventDefault();
+      invoke("open_url", { url: href }).catch(console.error);
+    }
+    document.addEventListener("click", handleLinkClick);
+    return () => document.removeEventListener("click", handleLinkClick);
+  }, []);
+
   // Global keyboard shortcuts
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {

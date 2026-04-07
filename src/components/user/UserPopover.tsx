@@ -3,7 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { useUiStore } from "@/stores/uiStore";
 import { PresenceDot } from "@/components/message/PresenceDot";
 import { UserAvatar } from "@/components/common/UserAvatar";
-import { MarkdownRenderer } from "@/components/message/MarkdownRenderer";
+import { CustomEmojiRenderer } from "@/components/message/CustomEmojiRenderer";
 
 interface UserProfile {
   id: string;
@@ -17,7 +17,7 @@ interface UserProfile {
   locale: string;
   avatar_url: string;
   last_activity_at: number;
-  props: Record<string, string> | null;
+  custom_attributes: string[];
 }
 
 interface UserPopoverProps {
@@ -66,7 +66,7 @@ export function UserPopover({
           locale: "",
           avatar_url: "",
           last_activity_at: 0,
-          props: null,
+          custom_attributes: [],
         }
       : null,
   );
@@ -117,15 +117,7 @@ export function UserPopover({
     .join(" ");
   const isAdmin = profile?.roles?.includes("system_admin");
 
-  // Extract custom attributes from props (keys starting with "customAttribute" or any non-system key)
-  const customAttrs: Array<{ key: string; value: string }> = [];
-  if (profile?.props) {
-    for (const [k, v] of Object.entries(profile.props)) {
-      if (typeof v === "string" && v.trim()) {
-        customAttrs.push({ key: k, value: v });
-      }
-    }
-  }
+  const customAttrs = profile?.custom_attributes ?? [];
 
   const lastSeenText = profile?.last_activity_at
     ? formatLastSeen(profile.last_activity_at)
@@ -175,9 +167,9 @@ export function UserPopover({
                 <span className="user-popover-last-seen"> · {lastSeenText}</span>
               )}
             </div>
-            {customAttrs.map(({ key, value }) => (
-              <div key={key} className="user-popover-custom-attr">
-                <MarkdownRenderer text={value} />
+            {customAttrs.map((text, i) => (
+              <div key={i} className="user-popover-custom-attr">
+                <CustomEmojiRenderer text={text} />
               </div>
             ))}
           </div>

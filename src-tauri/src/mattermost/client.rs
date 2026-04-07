@@ -278,6 +278,35 @@ impl MattermostClient {
         Ok(user)
     }
 
+    /// Fetches custom attributes from the com.mattermost.custom-attributes plugin.
+    /// Returns None if the plugin is not installed or returns an error.
+    pub async fn get_custom_attributes(&self, user_id: &str) -> Option<Vec<String>> {
+        let auth = self.auth_header().ok()?;
+        let url = format!(
+            "{}plugins/com.mattermost.custom-attributes/api/v1/attributes?user_id={}",
+            self.base_url, user_id
+        );
+        let resp = self
+            .http
+            .get(&url)
+            .header(header::AUTHORIZATION, &auth)
+            .send()
+            .await
+            .ok()?;
+        if !resp.status().is_success() {
+            return None;
+        }
+        let val: serde_json::Value = resp.json().await.ok()?;
+        // Response is an array of strings
+        let attrs = val
+            .as_array()?
+            .iter()
+            .filter_map(|v| v.as_str().map(|s| s.to_string()))
+            .filter(|s| !s.is_empty())
+            .collect();
+        Some(attrs)
+    }
+
     pub async fn get_user_raw(&self, user_id: &str) -> Result<serde_json::Value, AppError> {
         let resp = self
             .get_authenticated(&format!("/users/{}", user_id))
