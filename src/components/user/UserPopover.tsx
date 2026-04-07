@@ -273,12 +273,25 @@ export function UserPopover({
 
   if (!anchorEl) return null;
 
+  // Decide direction synchronously based on anchor position relative to viewport.
+  // We don't know the exact card height, but we DO know which half of the screen
+  // the anchor is in — open upward if in bottom half, downward if in top half.
+  // max-height in CSS ensures the card never overflows regardless of content size.
   const rect = anchorEl.getBoundingClientRect();
-  const style: React.CSSProperties = {
+  const vh = window.innerHeight;
+  const vw = window.innerWidth;
+  const POP_W = 280;
+  const gap = 4;
+  const openUpward = rect.bottom > vh / 2;
+
+  const popoverStyle: React.CSSProperties = {
     position: "fixed",
-    top: rect.bottom + 4,
-    left: rect.left,
     zIndex: 1000,
+    width: POP_W,
+    ...(openUpward
+      ? { bottom: vh - rect.top + gap }
+      : { top: rect.bottom + gap }),
+    left: Math.min(Math.max(rect.left, 8), vw - POP_W - 8),
   };
 
   const fullName = [profile?.first_name, profile?.last_name]
@@ -296,7 +309,7 @@ export function UserPopover({
 
   return (
     <>
-      <div className="user-popover" ref={popoverRef} style={style}>
+      <div className="user-popover" ref={popoverRef} style={popoverStyle}>
         {loading && !profile ? (
           <div className="user-popover-loading">
             <div className="spinner small" />
