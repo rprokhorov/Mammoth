@@ -7,6 +7,7 @@ use super::types::*;
 #[derive(Debug, Clone)]
 pub struct MattermostClient {
     http: Client,
+    http_slow: Client, // for heavy/slow endpoints (search, user lookup)
     base_url: Url,
     token: Option<String>,
 }
@@ -25,8 +26,14 @@ impl MattermostClient {
             .build()
             .map_err(AppError::Network)?;
 
+        let http_slow = Client::builder()
+            .timeout(std::time::Duration::from_secs(30))
+            .build()
+            .map_err(AppError::Network)?;
+
         Ok(Self {
             http,
+            http_slow,
             base_url,
             token: None,
         })
@@ -1443,6 +1450,66 @@ impl MattermostClient {
             return Err(AppError::Api { status, message: msg });
         }
         Ok(resp.json().await?)
+    }
+
+    /// Search users by term (username, first/last name, nickname) — searches all users
+    pub async fn search_users(
+        &self,
+        team_id: &str,
+        term: &str,
+    ) -> Result<Vec<User>, AppError> {
+        let auth = self.auth_header()?;
+        let body = serde_json::json!({
+            "term": term,
+            "team_id": team_id,
+            "limit": 20,
+        });
+        let resp = self
+            .http_slow
+            .post(self.api_url("/users/search"))
+            .header(header::AUTHORIZATION, &auth)
+            .json(&body)
+            .send()
+            .await?;
+        if !resp.status().is_success() {
+            let status = resp.status().as_u16();
+            let msg = resp.text().await.unwrap_or_default();
+            return Err(AppError::Api { status, message: msg });
+        }
+        Ok(resp.json().await?)
+    }
+
+    /// Autocomplete users by term within a team
+    pub async fn autocomplete_users(
+        &self,
+        team_id: &str,
+        term: &str,
+    ) -> Result<Vec<User>, AppError> {
+        let auth = self.auth_header()?;
+        let url = format!("{}api/v4/users/autocomplete", self.base_url);
+        let resp = self
+            .http_slow
+            .get(&url)
+            .header(header::AUTHORIZATION, &auth)
+            .query(&[("in_team", team_id), ("name", term), ("limit", "20")])
+            .send()
+            .await?;
+        if !resp.status().is_success() {
+            let status = resp.status().as_u16();
+            let msg = resp.text().await.unwrap_or_default();
+            return Err(AppError::Api { status, message: msg });
+        }
+        // API returns { users: [...], out_of_channel: [...] }
+        let val: serde_json::Value = resp.json().await?;
+        let users = val["users"]
+            .as_array()
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| serde_json::from_value::<User>(v.clone()).ok())
+                    .collect()
+            })
+            .unwrap_or_default();
+        Ok(users)
     }
 
     /// Get WebSocket URL for this server
