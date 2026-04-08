@@ -97,7 +97,7 @@ export function TabBar({ onSelectChannel }: TabBarProps) {
               {tab.unreadCount > 0 && (
                 <span className="tab-badge">{tab.unreadCount}</span>
               )}
-              {tabs.length > 1 && (
+              {tabs.length > 1 && !tab.isDefault && (
                 <span
                   className="tab-close"
                   onClick={(e) => handleCloseTab(e, tab.id)}

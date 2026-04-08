@@ -1,9 +1,15 @@
 import { create } from "zustand";
 
+let tabCounter = 0;
+function newTabId() {
+  return `tab-${++tabCounter}`;
+}
+
 export interface Tab {
-  id: string; // unique tab id (= channelId)
+  id: string;
   channelId: string;
   unreadCount: number;
+  isDefault?: boolean;
 }
 
 interface TabsState {
@@ -11,6 +17,7 @@ interface TabsState {
   activeTabId: string | null;
 
   openTab: (channelId: string) => void;
+  openNewTab: (channelId: string) => void;
   closeTab: (tabId: string) => void;
   setActiveTab: (tabId: string) => void;
   /** Update the first (default) tab to show a different channel and activate it */
@@ -28,35 +35,35 @@ export const useTabsStore = create<TabsState>((set, get) => ({
     const { tabs } = get();
     const existing = tabs.find((t) => t.channelId === channelId);
     if (existing) {
-      // Already open — just activate
       set({ activeTabId: existing.id });
       return;
     }
-    const newTab: Tab = {
-      id: channelId,
-      channelId,
-      unreadCount: 0,
-    };
+    const newTab: Tab = { id: newTabId(), channelId, unreadCount: 0 };
+    set({ tabs: [...tabs, newTab], activeTabId: newTab.id });
+  },
+
+  openNewTab: (channelId: string) => {
+    const { tabs } = get();
+    const newTab: Tab = { id: newTabId(), channelId, unreadCount: 0 };
     set({ tabs: [...tabs, newTab], activeTabId: newTab.id });
   },
 
   navigateDefaultTab: (channelId: string) => {
     const { tabs } = get();
-    // If this channel is already open in some tab, just activate it
-    const existing = tabs.find((t) => t.channelId === channelId);
+    // If this channel is already open in a non-default tab, just activate it
+    const existing = tabs.find((t) => t.channelId === channelId && !t.isDefault);
     if (existing) {
       set({ activeTabId: existing.id });
       return;
     }
-    // Otherwise, replace the first tab's channel
     if (tabs.length === 0) {
-      // No tabs yet — create one
-      const newTab: Tab = { id: channelId, channelId, unreadCount: 0 };
+      const newTab: Tab = { id: newTabId(), channelId, unreadCount: 0, isDefault: true };
       set({ tabs: [newTab], activeTabId: newTab.id });
       return;
     }
+    // Replace the default tab's channel (keep its id stable)
     const defaultTab = tabs[0];
-    const updated: Tab = { ...defaultTab, id: channelId, channelId, unreadCount: 0 };
+    const updated: Tab = { ...defaultTab, channelId, unreadCount: 0, isDefault: true };
     set({
       tabs: [updated, ...tabs.slice(1)],
       activeTabId: updated.id,
@@ -66,13 +73,14 @@ export const useTabsStore = create<TabsState>((set, get) => ({
   closeTab: (tabId: string) => {
     const { tabs, activeTabId } = get();
     if (tabs.length <= 1) return; // don't close last tab
+    const tab = tabs.find((t) => t.id === tabId);
+    if (tab?.isDefault) return; // don't close default tab
 
     const idx = tabs.findIndex((t) => t.id === tabId);
     const newTabs = tabs.filter((t) => t.id !== tabId);
 
     let newActiveId = activeTabId;
     if (activeTabId === tabId) {
-      // Activate the next tab, or previous if closing the last
       const newIdx = Math.min(idx, newTabs.length - 1);
       newActiveId = newTabs[newIdx]?.id ?? null;
     }

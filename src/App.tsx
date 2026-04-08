@@ -176,19 +176,20 @@ function AppContent() {
           store.setMainSubView(newView);
         }
       }
-      // Cmd/Ctrl+T — open current channel in a new tab (if not already)
+      // Cmd/Ctrl+T — open current channel in a new tab (always creates new)
       if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key === "t") {
         e.preventDefault();
         const channelId = useUiStore.getState().activeChannelId;
         if (channelId) {
-          useTabsStore.getState().openTab(channelId);
+          useTabsStore.getState().openNewTab(channelId);
         }
       }
-      // Cmd/Ctrl+W — close active tab
+      // Cmd/Ctrl+W — close active tab (default tab cannot be closed)
       if ((e.metaKey || e.ctrlKey) && e.key === "w") {
         e.preventDefault();
         const tabStore = useTabsStore.getState();
-        if (tabStore.activeTabId && tabStore.tabs.length > 1) {
+        const activeTab = tabStore.tabs.find((t) => t.id === tabStore.activeTabId);
+        if (tabStore.activeTabId && tabStore.tabs.length > 1 && !activeTab?.isDefault) {
           const closingId = tabStore.activeTabId;
           tabStore.closeTab(closingId);
           // Navigate to the new active tab's channel
