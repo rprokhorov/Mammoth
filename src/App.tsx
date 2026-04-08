@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef, useCallback, Component, type ReactNode, lazy, Suspense } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { useUiStore, type SidebarCategory } from "@/stores/uiStore";
 import { useMessagesStore } from "@/stores/messagesStore";
 import { useWebSocket } from "@/hooks/useWebSocket";
@@ -141,6 +142,14 @@ function AppContent() {
 
   useEffect(() => {
     loadServers();
+  }, []);
+
+  // Listen for menu:shortcuts event from native menu
+  useEffect(() => {
+    const unlisten = listen("menu:shortcuts", () => {
+      setShowShortcutsModal(true);
+    });
+    return () => { unlisten.then((fn) => fn()); };
   }, []);
 
   // Intercept all link clicks and open in system browser

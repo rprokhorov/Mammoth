@@ -11,7 +11,9 @@ const SHORTCUTS = [
   {
     category: "Navigation",
     items: [
+      { keys: `${mod}+P`, action: "Quick Switcher — open channel or DM" },
       { keys: `${mod}+K`, action: "Search messages" },
+      { keys: `${mod}+Shift+T`, action: "Toggle Threads view" },
       { keys: `${mod}+/`, action: "Show keyboard shortcuts" },
       { keys: "Escape", action: "Close panel / modal" },
     ],
@@ -20,21 +22,14 @@ const SHORTCUTS = [
     category: "Messages",
     items: [
       { keys: "Enter", action: "Send message" },
-      { keys: "Shift+Enter", action: "New line" },
-      { keys: "Up Arrow", action: "Edit last message (in empty composer)" },
-    ],
-  },
-  {
-    category: "Channels",
-    items: [
-      { keys: `${mod}+Shift+T`, action: "Toggle Threads view" },
+      { keys: "Shift+Enter", action: "New line in message" },
     ],
   },
   {
     category: "Tabs",
     items: [
       { keys: `${mod}+T`, action: "Open current channel in new tab" },
-      { keys: `${mod}+W`, action: "Close active tab" },
+      { keys: `${mod}+W`, action: "Close active tab (default tab is protected)" },
       { keys: `${mod}+1–9`, action: "Switch to tab by position" },
     ],
   },

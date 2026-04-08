@@ -5,7 +5,10 @@ mod state;
 mod storage;
 mod tray;
 
-use tauri::Manager;
+use tauri::{
+    menu::{Menu, MenuItemBuilder, PredefinedMenuItem},
+    Emitter, Manager,
+};
 use state::AppState;
 
 #[tauri::command]
@@ -38,7 +41,38 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_dialog::init())
         .manage(app_state)
+        .on_menu_event(|app, event| {
+            let id = event.id().as_ref();
+            if id == "shortcuts" {
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.emit("menu:shortcuts", ());
+                }
+            }
+        })
         .setup(|app| {
+            // Start from the OS default menu (includes App, Edit, View, Window, Help)
+            let menu = Menu::default(app.handle())?;
+
+            // Build "Window > Keyboard Shortcuts" submenu entry and append to existing Window menu
+            let shortcuts_item = MenuItemBuilder::with_id("shortcuts", "Keyboard Shortcuts")
+                .accelerator("CmdOrCtrl+/")
+                .build(app)?;
+            let separator = PredefinedMenuItem::separator(app)?;
+
+            // Find the Window submenu and prepend our item to it
+            let items = menu.items()?;
+            for item in &items {
+                if let tauri::menu::MenuItemKind::Submenu(sub) = item {
+                    if sub.text()?.starts_with("Window") {
+                        sub.prepend(&separator)?;
+                        sub.prepend(&shortcuts_item)?;
+                        break;
+                    }
+                }
+            }
+
+            app.set_menu(menu)?;
+
             if cfg!(debug_assertions) {
                 app.handle().plugin(
                     tauri_plugin_log::Builder::default()
