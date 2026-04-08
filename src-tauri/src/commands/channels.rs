@@ -5,6 +5,40 @@ use crate::errors::AppError;
 use crate::mattermost::types::{Channel, ChannelMember, User};
 use crate::state::AppState;
 
+#[tauri::command]
+pub async fn search_users(
+    state: State<'_, AppState>,
+    server_id: String,
+    team_id: String,
+    term: String,
+) -> Result<Vec<User>, AppError> {
+    let client = {
+        let servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let server = servers
+            .get(&server_id)
+            .ok_or_else(|| AppError::NotFound(format!("Server {} not found", server_id)))?;
+        server.client.clone()
+    };
+    client.search_users(&team_id, &term).await
+}
+
+#[tauri::command]
+pub async fn autocomplete_users(
+    state: State<'_, AppState>,
+    server_id: String,
+    team_id: String,
+    term: String,
+) -> Result<Vec<User>, AppError> {
+    let client = {
+        let servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let server = servers
+            .get(&server_id)
+            .ok_or_else(|| AppError::NotFound(format!("Server {} not found", server_id)))?;
+        server.client.clone()
+    };
+    client.autocomplete_users(&team_id, &term).await
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct ChannelWithMeta {
     #[serde(flatten)]
@@ -116,4 +150,38 @@ pub async fn get_users_by_ids(
     };
 
     client.get_users_by_ids(&user_ids).await
+}
+
+#[tauri::command]
+pub async fn get_channel_members_list(
+    state: State<'_, AppState>,
+    server_id: String,
+    channel_id: String,
+) -> Result<serde_json::Value, AppError> {
+    let client = {
+        let servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let server = servers
+            .get(&server_id)
+            .ok_or_else(|| AppError::NotFound(format!("Server {} not found", server_id)))?;
+        server.client.clone()
+    };
+    let members = client.get_channel_members_list(&channel_id, 0, 200).await?;
+    Ok(serde_json::to_value(members).unwrap_or_default())
+}
+
+#[tauri::command]
+pub async fn get_channel_files(
+    state: State<'_, AppState>,
+    server_id: String,
+    channel_id: String,
+) -> Result<serde_json::Value, AppError> {
+    let client = {
+        let servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let server = servers
+            .get(&server_id)
+            .ok_or_else(|| AppError::NotFound(format!("Server {} not found", server_id)))?;
+        server.client.clone()
+    };
+    let files = client.get_channel_files(&channel_id, 0, 100).await?;
+    Ok(serde_json::to_value(files).unwrap_or_default())
 }

@@ -4,15 +4,17 @@ import { useUiStore, type ChannelInfo, type SidebarCategory } from "@/stores/uiS
 import { useThreadsStore } from "@/stores/threadsStore";
 import { useTabsStore } from "@/stores/tabsStore";
 import { UserAvatar } from "@/components/common/UserAvatar";
+import { QuickSwitcher } from "@/components/search/QuickSwitcher";
 
 interface ChannelListProps {
   onSelectChannel: (channelId: string) => void;
   onCreateChannel?: () => void;
   serverId?: string | null;
   currentUserId?: string | null;
+  teamId?: string | null;
 }
 
-export function ChannelList({ onSelectChannel, onCreateChannel, serverId, currentUserId }: ChannelListProps) {
+export function ChannelList({ onSelectChannel, onCreateChannel, serverId, currentUserId, teamId }: ChannelListProps) {
   const channels = useUiStore((s) => s.channels);
   const activeChannelId = useUiStore((s) => s.activeChannelId);
   const users = useUiStore((s) => s.users);
@@ -52,6 +54,20 @@ export function ChannelList({ onSelectChannel, onCreateChannel, serverId, curren
   // Drag-and-drop state
   const [dragChannelId, setDragChannelId] = useState<string | null>(null);
   const [dragOverCategoryId, setDragOverCategoryId] = useState<string | null>(null);
+
+  // Quick switcher
+  const [showQuickSwitcher, setShowQuickSwitcher] = useState(false);
+
+  useEffect(() => {
+    function handleKey(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key === "p") {
+        e.preventDefault();
+        setShowQuickSwitcher((v) => !v);
+      }
+    }
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, []);
 
   useEffect(() => {
     if (renamingCategoryId && renameInputRef.current) {
@@ -133,6 +149,11 @@ export function ChannelList({ onSelectChannel, onCreateChannel, serverId, curren
           channelId,
           favorite: !isFav,
         });
+        // Reload sidebar categories so Favorites section updates
+        if (teamId) {
+          const categories = await invoke<SidebarCategory[]>("get_sidebar_categories", { serverId, teamId });
+          useUiStore.getState().setSidebarCategories(categories);
+        }
       } catch (e) {
         console.error("Failed to toggle favorite:", e);
         useUiStore.getState().toggleFavorite(channelId);
@@ -474,6 +495,15 @@ export function ChannelList({ onSelectChannel, onCreateChannel, serverId, curren
       }}
     >
       <button
+        className="channel-item find-nav-btn"
+        onClick={() => setShowQuickSwitcher(true)}
+        title="Find channels or people (⌘P)"
+      >
+        <span className="channel-prefix">🔍</span>
+        <span className="channel-name">Find</span>
+        <span className="quick-switcher-shortcut">⌘P</span>
+      </button>
+      <button
         className={`channel-item threads-nav-btn ${mainSubView === "threads" ? "active" : ""}`}
         onClick={handleThreadsClick}
       >
@@ -767,6 +797,15 @@ export function ChannelList({ onSelectChannel, onCreateChannel, serverId, curren
             </button>
           </div>
         </>
+      )}
+
+      {showQuickSwitcher && serverId && teamId && (
+        <QuickSwitcher
+          serverId={serverId}
+          teamId={teamId}
+          currentUserId={currentUserId ?? null}
+          onClose={() => setShowQuickSwitcher(false)}
+        />
       )}
     </nav>
   );

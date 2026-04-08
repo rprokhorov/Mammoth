@@ -18,6 +18,7 @@ import { useTabsStore } from "@/stores/tabsStore";
 import { useCustomEmojiStore, type CustomEmoji } from "@/stores/customEmojiStore";
 import { SearchBar } from "@/components/search/SearchBar";
 import { TabBar } from "@/components/layout/TabBar";
+import { ChannelInfoPanel } from "@/components/channel/ChannelInfoPanel";
 
 // Lazy-load heavy modals
 const ProfileModal = lazy(() => import("@/components/user/ProfileModal").then(m => ({ default: m.ProfileModal })));
@@ -103,6 +104,7 @@ function AppContent() {
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showShortcutsModal, setShowShortcutsModal] = useState(false);
   const [showCreateChannel, setShowCreateChannel] = useState(false);
+  const [showChannelInfo, setShowChannelInfo] = useState(false);
 
   // Resizable panel widths
   const [sidebarWidth, setSidebarWidth] = useState(240);
@@ -583,6 +585,7 @@ function AppContent() {
                 onCreateChannel={() => setShowCreateChannel(true)}
                 serverId={activeServerId}
                 currentUserId={currentUserId}
+                teamId={activeTeamId}
               />
             </div>
             <div className="resize-handle" onMouseDown={(e) => handleResizeMouseDown("sidebar", e)} />
@@ -594,6 +597,8 @@ function AppContent() {
                 onOpenProfile={() => setShowProfileModal(true)}
                 onOpenSettings={() => setShowSettingsModal(true)}
                 onOpenShortcuts={() => setShowShortcutsModal(true)}
+                showChannelInfo={showChannelInfo}
+                onToggleChannelInfo={() => setShowChannelInfo((v) => !v)}
               />
               <TabBar onSelectChannel={handleSelectChannel} />
               <div className="message-area">
@@ -628,6 +633,17 @@ function AppContent() {
                 <ThreadPanel
                   serverId={activeServerId}
                   currentUserId={currentUserId}
+                  width={threadWidth}
+                />
+              </>
+            )}
+            {showChannelInfo && activeServerId && (
+              <>
+                <div className="resize-handle" onMouseDown={(e) => handleResizeMouseDown("thread", e)} />
+                <ChannelInfoPanel
+                  serverId={activeServerId}
+                  onClose={() => setShowChannelInfo(false)}
+                  onOpenNotificationPrefs={() => {}}
                   width={threadWidth}
                 />
               </>

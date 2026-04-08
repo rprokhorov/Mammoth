@@ -165,6 +165,7 @@ Implemented in one pass:
 | 44 | Ссылки в карточке пользователя (и везде в приложении) открываются в системном браузере через глобальный перехватчик кликов + Rust open_url команду | Готово | 1 |
 | 47 | Quick Switcher (Cmd+P): пользователи отображаются в результатах поиска наряду с каналами | Готово | 1 (неправильные query-параметры в /users/autocomplete: team_id/term вместо in_team/name) |
 | 48 | Кастомные эмодзи загружаются полностью и корректно рендерятся (поддержка `+` в именах, case-insensitive lookup, пагинация до пустой страницы) | Готово | 1 |
+| 49 | Боковая панель информации о канале (кнопка i в шапке): Favorites/Mute/Copy Link, Purpose и Header с Markdown, channel_id, Notification Preferences, Members, Pinned Messages, Files | Готово | 1 |
 
 ---
 

@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import iconInfo from "@/assets/icon-info.png";
 import { useUiStore } from "@/stores/uiStore";
 import { PresenceDot } from "@/components/message/PresenceDot";
 import { UserAvatar } from "@/components/common/UserAvatar";
@@ -11,6 +12,8 @@ interface HeaderProps {
   onOpenProfile: () => void;
   onOpenSettings: () => void;
   onOpenShortcuts: () => void;
+  showChannelInfo: boolean;
+  onToggleChannelInfo: () => void;
 }
 
 export function Header({
@@ -20,6 +23,8 @@ export function Header({
   onOpenProfile,
   onOpenSettings,
   onOpenShortcuts,
+  showChannelInfo,
+  onToggleChannelInfo,
 }: HeaderProps) {
   const teams = useUiStore((s) => s.teams);
   const activeTeamId = useUiStore((s) => s.activeTeamId);
@@ -53,9 +58,6 @@ export function Header({
             ))}
           </select>
         )}
-        {teams.length === 1 && (
-          <span className="team-name">{teams[0].display_name}</span>
-        )}
       </div>
 
       <div className="header-center">
@@ -65,16 +67,21 @@ export function Header({
               {activeChannel.channel_type === "O" && "# "}
               {activeChannel.display_name}
             </span>
-            {activeChannel.header && (
-              <span className="channel-header-desc">
-                {activeChannel.header}
-              </span>
-            )}
           </div>
         )}
       </div>
 
       <div className="header-right" ref={menuRef}>
+        {activeChannel && (
+          <button
+            className={`header-icon-btn${showChannelInfo ? " active" : ""}`}
+            onClick={onToggleChannelInfo}
+            title="Channel Info"
+          >
+            <img src={iconInfo} width="20" height="20" alt="Channel Info" />
+          </button>
+        )}
+
         <span
           className={`ws-indicator ${wsStatus}`}
           title={`WebSocket: ${wsStatus}`}

@@ -939,6 +939,38 @@ impl MattermostClient {
         Ok(posts)
     }
 
+    pub async fn get_channel_members_list(
+        &self,
+        channel_id: &str,
+        page: u32,
+        per_page: u32,
+    ) -> Result<Vec<ChannelMember>, AppError> {
+        let resp = self
+            .get_authenticated(&format!(
+                "/channels/{}/members?page={}&per_page={}",
+                channel_id, page, per_page
+            ))
+            .await?;
+        let members: Vec<ChannelMember> = resp.json().await?;
+        Ok(members)
+    }
+
+    pub async fn get_channel_files(
+        &self,
+        channel_id: &str,
+        page: u32,
+        per_page: u32,
+    ) -> Result<Vec<FileInfo>, AppError> {
+        let resp = self
+            .get_authenticated(&format!(
+                "/channels/{}/files?page={}&per_page={}",
+                channel_id, page, per_page
+            ))
+            .await?;
+        let files: Vec<FileInfo> = resp.json().await?;
+        Ok(files)
+    }
+
     // --- Saved Posts (flagged) ---
 
     pub async fn save_post(&self, user_id: &str, post_id: &str) -> Result<(), AppError> {

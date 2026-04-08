@@ -98,6 +98,8 @@ pub fn run() {
             commands::get_channel,
             commands::view_channel,
             commands::get_users_by_ids,
+            commands::autocomplete_users,
+            commands::search_users,
             // Messages
             commands::get_posts,
             commands::send_post,
@@ -141,6 +143,8 @@ pub fn run() {
             commands::unsave_post,
             commands::get_saved_posts,
             commands::get_pinned_posts,
+            commands::get_channel_members_list,
+            commands::get_channel_files,
             // Profile
             commands::get_user_profile,
             commands::update_profile,
