@@ -21,10 +21,10 @@ export function SearchBar({ serverId, teamId }: SearchBarProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const users = useUiStore((s) => s.users);
 
-  // Cmd+K to toggle
+  // Cmd+F to toggle
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+      if ((e.metaKey || e.ctrlKey) && e.key === "f") {
         e.preventDefault();
         setIsOpen((v) => !v);
       }
