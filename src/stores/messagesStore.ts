@@ -56,8 +56,21 @@ export const useMessagesStore = create<MessagesState>((set) => ({
 
   setChannelPosts: (channelId, order, posts) =>
     set((state) => {
+      // Merge posts preserving the highest reply_count seen so far
+      const mergedPosts = { ...state.posts };
+      for (const [id, post] of Object.entries(posts)) {
+        const existing = mergedPosts[id];
+        if (existing) {
+          mergedPosts[id] = {
+            ...existing,
+            ...post,
+            reply_count: Math.max(existing.reply_count ?? 0, post.reply_count ?? 0),
+          };
+        } else {
+          mergedPosts[id] = post;
+        }
+      }
       // Compute reply counts from the loaded posts for root posts that have reply_count: 0
-      const mergedPosts = { ...state.posts, ...posts };
       const replyCounts: Record<string, number> = {};
       for (const post of Object.values(posts)) {
         if (post.root_id) {
@@ -129,9 +142,36 @@ export const useMessagesStore = create<MessagesState>((set) => ({
     set((state) => {
       const existing = state.orderByChannel[channelId] || [];
       const newOrder = [...existing, ...order.filter((id) => !existing.includes(id))];
+      // Merge posts preserving the highest reply_count seen so far
+      const mergedPosts = { ...state.posts };
+      for (const [id, post] of Object.entries(posts)) {
+        const existingPost = mergedPosts[id];
+        if (existingPost) {
+          mergedPosts[id] = {
+            ...existingPost,
+            ...post,
+            reply_count: Math.max(existingPost.reply_count ?? 0, post.reply_count ?? 0),
+          };
+        } else {
+          mergedPosts[id] = post;
+        }
+      }
+      // Compute reply counts from newly loaded posts for root posts that have reply_count: 0
+      const replyCounts: Record<string, number> = {};
+      for (const post of Object.values(posts)) {
+        if (post.root_id) {
+          replyCounts[post.root_id] = (replyCounts[post.root_id] || 0) + 1;
+        }
+      }
+      for (const [rootId, count] of Object.entries(replyCounts)) {
+        const rootPost = mergedPosts[rootId];
+        if (rootPost && (rootPost.reply_count ?? 0) < count) {
+          mergedPosts[rootId] = { ...rootPost, reply_count: count };
+        }
+      }
       return {
         orderByChannel: { ...state.orderByChannel, [channelId]: newOrder },
-        posts: { ...state.posts, ...posts },
+        posts: mergedPosts,
       };
     }),
 
