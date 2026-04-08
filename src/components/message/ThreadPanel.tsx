@@ -1,10 +1,26 @@
 import { useEffect, useRef, useState, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { open } from "@tauri-apps/plugin-dialog";
 import { useThreadsStore } from "@/stores/threadsStore";
 import { useMessagesStore, type PostData } from "@/stores/messagesStore";
 import { useUiStore } from "@/stores/uiStore";
 import { MessageItem } from "./MessageItem";
 import { EmojiPicker, EMOJI_MAP } from "./EmojiPicker";
+
+interface AttachedFile {
+  path: string;
+  name: string;
+  previewUrl?: string;
+  uploading: boolean;
+  fileId?: string;
+  error?: string;
+}
+
+interface FileUploadResult {
+  file_infos: Array<{ id: string }>;
+}
+
+const IMAGE_EXTS = ["png", "jpg", "jpeg", "gif", "bmp", "webp"];
 
 interface PostsResponse {
   order: string[];
@@ -32,6 +48,8 @@ export function ThreadPanel({ serverId, currentUserId, width }: ThreadPanelProps
 
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
+  const [attachments, setAttachments] = useState<AttachedFile[]>([]);
+  const [isDragging, setIsDragging] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [emojiPickerStyle, setEmojiPickerStyle] = useState<React.CSSProperties>({});
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -117,9 +135,115 @@ export function ThreadPanel({ serverId, currentUserId, width }: ThreadPanelProps
 
   const rootPost = threadPosts[activeThreadId] || useMessagesStore.getState().posts[activeThreadId];
 
+  async function uploadFile(path: string, name: string, channelId: string): Promise<string | undefined> {
+    try {
+      const result = await invoke<FileUploadResult>("upload_file", {
+        serverId,
+        channelId,
+        filePath: path,
+        fileName: name,
+      });
+      return result.file_infos[0]?.id;
+    } catch (e) {
+      console.error("Upload failed:", e);
+      return undefined;
+    }
+  }
+
+  async function addFiles(files: Array<{ path: string; name: string }>, channelId: string) {
+    const newAttachments: AttachedFile[] = files.map((f) => ({ path: f.path, name: f.name, uploading: true }));
+    setAttachments((prev) => [...prev, ...newAttachments]);
+
+    for (const file of files) {
+      const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
+      const isImage = IMAGE_EXTS.includes(ext);
+
+      let previewUrl: string | undefined;
+      if (isImage) {
+        try {
+          const mimeType = ext === "jpg" ? "image/jpeg" : `image/${ext}`;
+          const data = await invoke<{ data_url: string }>("read_local_file_as_data_url", { filePath: file.path, mimeType });
+          previewUrl = data.data_url;
+        } catch { /* preview not critical */ }
+      }
+
+      const fileId = await uploadFile(file.path, file.name, channelId);
+      setAttachments((prev) =>
+        prev.map((a) => a.path === file.path
+          ? { ...a, uploading: false, fileId, previewUrl, error: fileId ? undefined : "Upload failed" }
+          : a
+        )
+      );
+    }
+  }
+
+  async function handleAttachClick() {
+    const rootPost = threadPosts[activeThreadId!] || useMessagesStore.getState().posts[activeThreadId!];
+    if (!rootPost) return;
+    try {
+      const selected = await open({ multiple: true });
+      if (!selected) return;
+      const paths = Array.isArray(selected) ? selected : [selected];
+      await addFiles(paths.map((p) => ({ path: p, name: p.split("/").pop() ?? p })), rootPost.channel_id);
+    } catch (e) {
+      console.error("File picker error:", e);
+    }
+  }
+
+  async function handlePaste(e: React.ClipboardEvent) {
+    const items = Array.from(e.clipboardData.items);
+    const imageItems = items.filter((item) => item.type.startsWith("image/"));
+    if (imageItems.length === 0) return;
+    const rootPost = threadPosts[activeThreadId!] || useMessagesStore.getState().posts[activeThreadId!];
+    if (!rootPost) return;
+
+    e.preventDefault();
+    for (const item of imageItems) {
+      const file = item.getAsFile();
+      if (!file) continue;
+      try {
+        const ext = item.type.split("/")[1] ?? "png";
+        const tmpName = `clipboard_${Date.now()}.${ext}`;
+        const dataBase64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve((reader.result as string).split(",")[1] ?? "");
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+        const tmpPath = await invoke<string>("save_temp_file", { fileName: tmpName, dataBase64 });
+        await addFiles([{ path: tmpPath, name: tmpName }], rootPost.channel_id);
+      } catch { /* ignore */ }
+    }
+  }
+
+  function handleDragOver(e: React.DragEvent) {
+    e.preventDefault();
+    setIsDragging(true);
+  }
+
+  function handleDragLeave() {
+    setIsDragging(false);
+  }
+
+  async function handleDrop(e: React.DragEvent) {
+    e.preventDefault();
+    setIsDragging(false);
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length === 0) return;
+    const rootPost = threadPosts[activeThreadId!] || useMessagesStore.getState().posts[activeThreadId!];
+    if (!rootPost) return;
+    await addFiles(files.map((f) => ({ path: (f as File & { path?: string }).path ?? f.name, name: f.name })), rootPost.channel_id);
+  }
+
+  function removeAttachment(path: string) {
+    setAttachments((prev) => prev.filter((a) => a.path !== path));
+  }
+
   async function handleSend() {
     const trimmed = text.trim();
-    if (!trimmed || sending || !activeThreadId) return;
+    const readyFileIds = attachments.filter((a) => a.fileId).map((a) => a.fileId!);
+    if ((!trimmed && readyFileIds.length === 0) || sending || !activeThreadId) return;
+    if (attachments.some((a) => a.uploading)) return;
 
     setSending(true);
     try {
@@ -129,11 +253,12 @@ export function ThreadPanel({ serverId, currentUserId, width }: ThreadPanelProps
         channelId: rootPost?.channel_id ?? "",
         message: trimmed,
         rootId: activeThreadId,
+        fileIds: readyFileIds.length > 0 ? readyFileIds : undefined,
       });
       useThreadsStore.getState().addThreadReply(newPost);
-      // Also add to main messages store
       useMessagesStore.getState().addPost(newPost);
       setText("");
+      setAttachments([]);
     } catch (e) {
       console.error("Failed to send reply:", e);
     } finally {
@@ -186,8 +311,17 @@ export function ThreadPanel({ serverId, currentUserId, width }: ThreadPanelProps
   // Count replies (all posts except root)
   const replyCount = order.filter((id) => id !== activeThreadId).length;
 
+  const canSend = (text.trim().length > 0 || attachments.some((a) => a.fileId)) && !sending && !attachments.some((a) => a.uploading);
+
   return (
-    <div className="thread-panel" style={width ? { width, minWidth: width } : undefined}>
+    <div
+      className={`thread-panel ${isDragging ? "drag-over" : ""}`}
+      style={width ? { width, minWidth: width } : undefined}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      {isDragging && <div className="composer-drop-hint">Drop files to attach</div>}
       <div className="thread-panel-header">
         <div className="thread-panel-title">
           <span className="thread-title-text">Thread</span>
@@ -251,13 +385,44 @@ export function ThreadPanel({ serverId, currentUserId, width }: ThreadPanelProps
       </div>
 
       <div className="thread-panel-composer">
+        {attachments.length > 0 && (
+          <div className="composer-attachments">
+            {attachments.map((att) => {
+              const ext = att.name.split(".").pop()?.toLowerCase() ?? "";
+              const isImage = IMAGE_EXTS.includes(ext);
+              return (
+                <div key={att.path} className={`composer-attachment ${att.error ? "error" : ""}`}>
+                  {isImage && att.previewUrl ? (
+                    <img src={att.previewUrl} alt={att.name} className="composer-attachment-thumb" />
+                  ) : (
+                    <span className="composer-attachment-icon">📄</span>
+                  )}
+                  <span className="composer-attachment-name">{att.name}</span>
+                  {att.uploading && <span className="composer-attachment-status">⏳</span>}
+                  {att.error && <span className="composer-attachment-status error">✗</span>}
+                  {att.fileId && <span className="composer-attachment-status ok">✓</span>}
+                  <button className="composer-attachment-remove" onClick={() => removeAttachment(att.path)} title="Remove">✕</button>
+                </div>
+              );
+            })}
+          </div>
+        )}
         <div className="composer-input-row">
+          <button
+            className="composer-attach-btn"
+            onClick={handleAttachClick}
+            title="Attach file"
+            disabled={sending}
+          >
+            📎
+          </button>
           <textarea
             ref={textareaRef}
             className="composer-textarea"
             value={text}
             onChange={(e) => handleTextChange(e.target.value)}
             onKeyDown={handleKeyDown}
+            onPaste={handlePaste}
             placeholder="Reply..."
             rows={1}
             disabled={sending}
@@ -299,7 +464,7 @@ export function ThreadPanel({ serverId, currentUserId, width }: ThreadPanelProps
           <button
             className="composer-send-btn"
             onClick={handleSend}
-            disabled={!text.trim() || sending}
+            disabled={!canSend}
             title="Send reply"
           >
             ➤
