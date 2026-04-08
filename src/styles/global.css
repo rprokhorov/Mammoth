@@ -775,7 +775,7 @@ button.secondary:hover:not(:disabled) {
 }
 
 .channel-group {
-  margin-bottom: 8px;
+  margin-bottom: 0;
 }
 
 .channel-group-title {
@@ -783,7 +783,7 @@ button.secondary:hover:not(:disabled) {
   font-weight: 600;
   text-transform: uppercase;
   color: var(--text-muted);
-  padding: 8px 16px 4px;
+  padding: 2px 8px 2px;
   letter-spacing: 0.5px;
   flex: 1;
   overflow: hidden;
@@ -795,7 +795,7 @@ button.secondary:hover:not(:disabled) {
 .channel-group-header {
   display: flex;
   align-items: center;
-  padding: 8px 4px 4px 4px;
+  padding: 4px 4px 2px 4px;
   gap: 2px;
 }
 
