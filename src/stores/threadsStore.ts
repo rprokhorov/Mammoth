@@ -96,16 +96,22 @@ export const useThreadsStore = create<ThreadsState>((set) => ({
 
   markThreadRead: (threadId) =>
     set((state) => {
-      const wasUnread = state.userThreads.some(
-        (t) => t.id === threadId && t.unread_replies > 0,
-      );
+      const thread = state.userThreads.find((t) => t.id === threadId);
+      // Thread is unread if it's in the list with unread_replies > 0,
+      // OR if it's not in the list at all (was incremented via incrementThreadUnread for unknown thread)
+      const wasUnread = thread ? thread.unread_replies > 0 : false;
+      // If thread not in list, we may have bumped the global counter anyway — check via a marker
+      // We track this by checking if userThreadsUnread > count of unread threads in list
+      const knownUnreadCount = state.userThreads.filter((t) => t.unread_replies > 0).length;
+      const hasOrphanedCount = state.userThreadsUnread > knownUnreadCount;
+      const shouldDecrement = wasUnread || (!thread && hasOrphanedCount);
       return {
         userThreads: state.userThreads.map((t) =>
           t.id === threadId
             ? { ...t, unread_replies: 0, unread_mentions: 0, last_viewed_at: Date.now() }
             : t,
         ),
-        userThreadsUnread: wasUnread
+        userThreadsUnread: shouldDecrement
           ? Math.max(0, state.userThreadsUnread - 1)
           : state.userThreadsUnread,
       };

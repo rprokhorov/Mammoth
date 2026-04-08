@@ -117,8 +117,12 @@ function handlePosted(
       if (activeThreadId === post.root_id) {
         useThreadsStore.getState().addThreadReply(post);
       } else {
-        // Thread is not open — increment unread count for the followed thread
-        useThreadsStore.getState().incrementThreadUnread(post.root_id);
+        // Thread is not open — increment unread count only for followed threads
+        const { userThreads } = useThreadsStore.getState();
+        const isFollowed = userThreads.some((t) => t.id === post.root_id);
+        if (isFollowed) {
+          useThreadsStore.getState().incrementThreadUnread(post.root_id);
+        }
       }
     } else {
       // Top-level post — add to channel order

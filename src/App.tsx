@@ -291,9 +291,9 @@ function AppContent() {
         // Load teams & channels
         await loadTeams(targetId);
         // Load user threads so unread badge works immediately
-        const teamId = store.activeTeamId;
-        if (teamId) {
-          loadUserThreads(targetId, teamId).catch(() => {});
+        const teamIdAfterLoad = useUiStore.getState().activeTeamId;
+        if (teamIdAfterLoad) {
+          loadUserThreads(targetId, teamIdAfterLoad).catch(() => {});
         }
         // Load custom emojis in background
         loadCustomEmojis(targetId).catch(() => {});
@@ -347,9 +347,9 @@ function AppContent() {
     await loadTeams(serverId);
 
     // Load user threads so unread badge works immediately
-    const teamId = store.activeTeamId;
-    if (teamId) {
-      loadUserThreads(serverId, teamId).catch(() => {});
+    const teamIdAfterLoad = useUiStore.getState().activeTeamId;
+    if (teamIdAfterLoad) {
+      loadUserThreads(serverId, teamIdAfterLoad).catch(() => {});
     }
 
     // Load custom emojis in background
