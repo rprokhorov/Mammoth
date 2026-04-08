@@ -913,10 +913,11 @@ button.secondary:hover:not(:disabled) {
 }
 
 .context-submenu {
-  position: absolute;
+  position: absolute !important;
   left: 100%;
   top: -4px;
   min-width: 160px;
+  margin-left: -2px;
 }
 
 /* Danger context menu item */

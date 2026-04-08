@@ -239,7 +239,7 @@ pub struct SidebarCategory {
     pub team_id: String,
     pub sort_order: i64,
     pub sorting: String,
-    #[serde(rename = "type")]
+    #[serde(rename = "category_type", alias = "type")]
     pub category_type: String,
     pub display_name: String,
     #[serde(default)]
@@ -267,7 +267,7 @@ pub struct SidebarCategoryUpdate {
     pub display_name: String,
     pub channel_ids: Vec<String>,
     pub sort_order: i64,
-    #[serde(rename = "type")]
+    #[serde(rename = "type", alias = "category_type")]
     pub category_type: String,
     #[serde(default)]
     pub sorting: String,

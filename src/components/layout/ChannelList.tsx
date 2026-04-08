@@ -694,7 +694,11 @@ export function ChannelList({ onSelectChannel, onCreateChannel, serverId, curren
                   <span>Move to Category</span>
                   <span className="submenu-arrow">&#8250;</span>
                   {showMoveSubmenu && (
-                    <div className="context-menu context-submenu">
+                    <div
+                      className="context-menu context-submenu"
+                      onMouseEnter={() => setShowMoveSubmenu(true)}
+                      onMouseLeave={() => setShowMoveSubmenu(false)}
+                    >
                       {customCategories.map((cat) => (
                         <button
                           key={cat.id}
