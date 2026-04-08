@@ -601,7 +601,7 @@ function AppContent() {
                 showChannelInfo={showChannelInfo}
                 onToggleChannelInfo={() => setShowChannelInfo((v) => !v)}
               />
-              <TabBar onSelectChannel={handleSelectChannel} />
+              <TabBar onSelectChannel={handleSelectChannel} currentUserId={currentUserId} />
               <div className="message-area">
                 {mainSubView === "threads" && activeServerId && activeTeamId ? (
                   <ThreadsView serverId={activeServerId} teamId={activeTeamId} />

@@ -4,9 +4,10 @@ import { useUiStore, type ChannelInfo } from "@/stores/uiStore";
 
 interface TabBarProps {
   onSelectChannel: (channelId: string) => void;
+  currentUserId: string | null;
 }
 
-export function TabBar({ onSelectChannel }: TabBarProps) {
+export function TabBar({ onSelectChannel, currentUserId }: TabBarProps) {
   const tabs = useTabsStore((s) => s.tabs);
   const activeTabId = useTabsStore((s) => s.activeTabId);
   const channels = useUiStore((s) => s.channels);
@@ -19,6 +20,7 @@ export function TabBar({ onSelectChannel }: TabBarProps) {
       if (channel.channel_type === "D") {
         const parts = channel.name.split("__");
         for (const part of parts) {
+          if (part === currentUserId) continue;
           const user = users[part];
           if (user) {
             return (
@@ -30,9 +32,21 @@ export function TabBar({ onSelectChannel }: TabBarProps) {
         }
         return channel.display_name || "Direct Message";
       }
+      if (channel.channel_type === "G") {
+        const parts = channel.name.split("__");
+        const names = parts
+          .filter((p) => p !== currentUserId)
+          .map((p) => {
+            const user = users[p];
+            if (!user) return null;
+            return user.nickname || `${user.first_name} ${user.last_name}`.trim() || user.username;
+          })
+          .filter(Boolean);
+        return names.length > 0 ? names.join(", ") : channel.display_name || "Group Message";
+      }
       return channel.display_name;
     },
-    [users],
+    [users, currentUserId],
   );
 
   const getChannelIcon = useCallback((channel: ChannelInfo | undefined): string => {
