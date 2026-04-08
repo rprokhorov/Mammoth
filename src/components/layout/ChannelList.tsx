@@ -533,8 +533,6 @@ export function ChannelList({ onSelectChannel, onCreateChannel, serverId, curren
                 .map((id) => channelMap.get(id))
                 .filter((ch): ch is ChannelInfo => ch !== undefined);
 
-              if (catChannels.length === 0) return null;
-
               const isCollapsed = collapsedCategories.has(cat.id);
 
               return (
