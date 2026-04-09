@@ -1791,6 +1791,29 @@ button.secondary:hover:not(:disabled) {
   color: var(--text-muted);
 }
 
+.thread-channel-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 500;
+  padding: 3px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-right: 6px;
+  flex-shrink: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 120px;
+  transition: background 0.15s;
+}
+
+.thread-channel-btn:hover {
+  color: var(--text-primary);
+}
+
 .thread-follow-btn {
   background: transparent;
   border: 1px solid var(--text-muted);

@@ -5,6 +5,8 @@ import { useTauriDragDrop } from "@/hooks/useTauriDragDrop";
 import { useThreadsStore } from "@/stores/threadsStore";
 import { useMessagesStore, type PostData } from "@/stores/messagesStore";
 import { useUiStore } from "@/stores/uiStore";
+import { useTabsStore } from "@/stores/tabsStore";
+import { primeLastViewedSnapshot } from "@/stores/lastViewedSnapshot";
 import { MessageItem } from "./MessageItem";
 import { EmojiPicker, EMOJI_MAP } from "./EmojiPicker";
 
@@ -367,6 +369,19 @@ export function ThreadPanel({ serverId, currentUserId, width }: ThreadPanelProps
     useThreadsStore.getState().clearThread();
   }
 
+  function handleGoToChannel() {
+    if (!rootPost) return;
+    const uiStore = useUiStore.getState();
+    const ch = uiStore.channels.find((c) => c.id === rootPost.channel_id);
+    if (ch) {
+      primeLastViewedSnapshot(ch.id, ch.last_viewed_at);
+    }
+    uiStore.setActiveChannelId(rootPost.channel_id);
+    uiStore.setMainSubView("channels");
+    const tabStore = useTabsStore.getState();
+    tabStore.navigateDefaultTab(rootPost.channel_id);
+  }
+
   // Adjust textarea height
   function handleTextChange(value: string) {
     setText(value);
@@ -380,6 +395,34 @@ export function ThreadPanel({ serverId, currentUserId, width }: ThreadPanelProps
   // Count replies (all posts except root)
   const replyCount = order.filter((id) => id !== activeThreadId).length;
 
+  const channelName = useMemo(() => {
+    if (!rootPost) return null;
+    const store = useUiStore.getState();
+    const ch = store.channels.find((c) => c.id === rootPost.channel_id);
+    if (!ch) return null;
+    if (ch.channel_type === "D") {
+      const parts = ch.name.split("__");
+      for (const part of parts) {
+        if (part === currentUserId) continue;
+        const user = store.users[part];
+        if (user) return user.nickname || `${user.first_name} ${user.last_name}`.trim() || user.username;
+      }
+      // fallback: any part
+      for (const part of parts) {
+        const user = store.users[part];
+        if (user) return user.nickname || `${user.first_name} ${user.last_name}`.trim() || user.username;
+      }
+      return ch.display_name || "Direct Message";
+    }
+    return ch.display_name || ch.name;
+  }, [rootPost, currentUserId]);
+
+  const isDmChannel = useMemo(() => {
+    if (!rootPost) return false;
+    const ch = useUiStore.getState().channels.find((c) => c.id === rootPost.channel_id);
+    return ch?.channel_type === "D" || ch?.channel_type === "G";
+  }, [rootPost]);
+
   const canSend = (text.trim().length > 0 || attachments.some((a) => a.fileId)) && !sending && !attachments.some((a) => a.uploading);
 
   return (
@@ -392,6 +435,15 @@ export function ThreadPanel({ serverId, currentUserId, width }: ThreadPanelProps
           <span className="thread-title-text">Thread</span>
           <span className="thread-reply-count">{replyCount} {replyCount === 1 ? "reply" : "replies"}</span>
         </div>
+        {channelName && (
+          <button
+            className="thread-channel-btn"
+            onClick={handleGoToChannel}
+            title={`Go to ${channelName}`}
+          >
+            {isDmChannel ? channelName : `# ${channelName}`}
+          </button>
+        )}
         <button
           className={`thread-follow-btn ${isFollowing ? "following" : ""}`}
           onClick={handleToggleFollow}
