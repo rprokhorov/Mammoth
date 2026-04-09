@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { startChannelDrag, endChannelDrag, createGhost, moveGhost, removeGhost, setDragOver } from "@/hooks/useChannelDrag";
 import { invoke } from "@tauri-apps/api/core";
 import { useUiStore, type ChannelInfo, type SidebarCategory } from "@/stores/uiStore";
 import { useThreadsStore } from "@/stores/threadsStore";
@@ -394,14 +395,39 @@ export function ChannelList({ onSelectChannel, onCreateChannel, serverId, curren
       <button
         key={ch.id}
         className={`channel-item ${activeChannelId === ch.id ? "active" : ""} ${isUnread(ch) ? "unread" : ""} ${dragChannelId === ch.id ? "dragging" : ""}`}
-        draggable
-        onDragStart={(e) => {
-          e.dataTransfer.effectAllowed = "move";
-          setDragChannelId(ch.id);
-        }}
-        onDragEnd={() => {
-          setDragChannelId(null);
-          setDragOverCategoryId(null);
+        onMouseDown={(e) => {
+          if (e.button !== 0) return;
+          const channelId = ch.id;
+          const channelName = getDisplayName(ch);
+          let dragging = false;
+          const startX = e.clientX, startY = e.clientY;
+
+          function onMove(me: MouseEvent) {
+            if (!dragging && Math.hypot(me.clientX - startX, me.clientY - startY) > 5) {
+              dragging = true;
+              setDragChannelId(channelId);
+              startChannelDrag(channelId, channelName);
+              createGhost(channelName);
+            }
+            if (!dragging) return;
+            moveGhost(me.clientX, me.clientY);
+            // Signal TabBar to check hover
+            setDragOver(true);
+          }
+
+          function onUp(me: MouseEvent) {
+            window.removeEventListener("mousemove", onMove);
+            window.removeEventListener("mouseup", onUp);
+            if (dragging) {
+              removeGhost();
+              setDragChannelId(null);
+              setDragOverCategoryId(null);
+              endChannelDrag(me.clientX, me.clientY);
+            }
+          }
+
+          window.addEventListener("mousemove", onMove);
+          window.addEventListener("mouseup", onUp);
         }}
         onClick={() => onSelectChannel(ch.id)}
         onAuxClick={(e) => {

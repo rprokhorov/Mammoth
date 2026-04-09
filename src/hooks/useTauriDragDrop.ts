@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
+import { getDraggingChannelId } from "./useChannelDrag";
 
 type DropHandler = (paths: string[]) => void;
 
@@ -15,6 +16,8 @@ function isInside(el: HTMLElement, x: number, y: number) {
 
 async function startListener() {
   const un = await getCurrentWebview().onDragDropEvent((event) => {
+    // Ignore Tauri file drag events when an internal channel drag is in progress
+    if (getDraggingChannelId()) return;
     const payload = event.payload;
     if (payload.type === "over") {
       const { x, y } = payload.position;

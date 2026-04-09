@@ -1,6 +1,7 @@
-import { useRef, useCallback } from "react";
+import { useRef, useCallback, useState, useEffect } from "react";
 import { useTabsStore } from "@/stores/tabsStore";
 import { useUiStore, type ChannelInfo } from "@/stores/uiStore";
+import { onDragOver, onDragEnd } from "@/hooks/useChannelDrag";
 
 interface TabBarProps {
   onSelectChannel: (channelId: string) => void;
@@ -13,6 +14,39 @@ export function TabBar({ onSelectChannel, currentUserId }: TabBarProps) {
   const channels = useUiStore((s) => s.channels);
   const users = useUiStore((s) => s.users);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const tabBarRef = useRef<HTMLDivElement>(null);
+  const [dropTarget, setDropTarget] = useState(false);
+  const [channelDragging, setChannelDragging] = useState(false);
+  const isDraggingRef = useRef(false);
+
+  useEffect(() => {
+    const unOver = onDragOver((isDragging) => {
+      isDraggingRef.current = isDragging;
+      setChannelDragging(isDragging);
+      if (!isDragging) setDropTarget(false);
+    });
+
+    function onMouseMove(e: MouseEvent) {
+      if (!isDraggingRef.current || !tabBarRef.current) return;
+      const rect = tabBarRef.current.getBoundingClientRect();
+      const inside = e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom;
+      setDropTarget(inside);
+    }
+    window.addEventListener("mousemove", onMouseMove);
+    const unEnd = onDragEnd((channelId, x, y) => {
+      setChannelDragging(false);
+      setDropTarget(false);
+      const el = tabBarRef.current;
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      const inside = x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
+      if (inside) {
+        useTabsStore.getState().openNewTab(channelId);
+        onSelectChannel(channelId);
+      }
+    });
+    return () => { unOver(); unEnd(); window.removeEventListener("mousemove", onMouseMove); };
+  }, [onSelectChannel]);
 
   const getChannelDisplayName = useCallback(
     (channel: ChannelInfo | undefined, channelId: string): string => {
@@ -88,10 +122,15 @@ export function TabBar({ onSelectChannel, currentUserId }: TabBarProps) {
     }
   }
 
-  if (tabs.length === 0) return null;
+  const isVisible = tabs.length > 0 || channelDragging;
 
   return (
-    <div className="tab-bar" onWheel={handleWheel}>
+    <div
+      ref={tabBarRef}
+      className={`tab-bar ${dropTarget ? "tab-bar-drop-target" : ""}`}
+      style={!isVisible ? { height: 0, overflow: "hidden", border: "none" } : undefined}
+      onWheel={handleWheel}
+    >
       <div className="tab-bar-scroll" ref={scrollRef}>
         {tabs.map((tab) => {
           const channel = channels.find((ch) => ch.id === tab.channelId);
