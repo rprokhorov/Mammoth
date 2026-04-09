@@ -37,6 +37,7 @@ interface ThreadsState {
   clearThread: () => void;
   markThreadRead: (threadId: string) => void;
   incrementThreadUnread: (threadId: string) => void;
+  updateThreadFollowing: (threadId: string, isFollowing: boolean) => void;
 }
 
 export const useThreadsStore = create<ThreadsState>((set) => ({
@@ -115,6 +116,31 @@ export const useThreadsStore = create<ThreadsState>((set) => ({
           ? Math.max(0, state.userThreadsUnread - 1)
           : state.userThreadsUnread,
       };
+    }),
+
+  updateThreadFollowing: (threadId, isFollowing) =>
+    set((state) => {
+      const exists = state.userThreads.some((t) => t.id === threadId);
+      if (exists) {
+        return {
+          userThreads: state.userThreads.map((t) =>
+            t.id === threadId ? { ...t, is_following: isFollowing } : t,
+          ),
+        };
+      }
+      // Thread not in list yet — add a minimal entry so is_following is tracked
+      const stub: UserThread = {
+        id: threadId,
+        reply_count: 0,
+        last_reply_at: 0,
+        last_viewed_at: 0,
+        participants: [],
+        post: null,
+        unread_replies: 0,
+        unread_mentions: 0,
+        is_following: isFollowing,
+      };
+      return { userThreads: [...state.userThreads, stub] };
     }),
 
   incrementThreadUnread: (threadId) =>

@@ -142,6 +142,7 @@ pub fn run() {
             // Threads
             commands::get_post_thread,
             commands::get_user_threads,
+            commands::get_thread,
             commands::follow_thread,
             commands::unfollow_thread,
             commands::mark_thread_as_read,

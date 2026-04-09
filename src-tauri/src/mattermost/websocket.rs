@@ -184,6 +184,7 @@ fn handle_message(app_handle: &tauri::AppHandle, server_id: &str, text: &str) {
     // Parse as event
     match serde_json::from_str::<WsEvent>(text) {
         Ok(event) => {
+            log::debug!("[WS:{}] Event: {}", server_id, event.event);
             let frontend_event = FrontendWsEvent {
                 server_id: server_id.to_string(),
                 event: event.event.clone(),

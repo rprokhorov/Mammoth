@@ -1,7 +1,7 @@
 use tauri::State;
 
 use crate::errors::AppError;
-use crate::mattermost::types::{PostList, UserThreadList};
+use crate::mattermost::types::{PostList, UserThread, UserThreadList};
 use crate::state::AppState;
 
 #[tauri::command]
@@ -43,6 +43,29 @@ pub async fn get_user_threads(
     };
 
     client.get_threads_for_user(&user_id, &team_id, page, per_page).await
+}
+
+#[tauri::command]
+pub async fn get_thread(
+    state: State<'_, AppState>,
+    server_id: String,
+    team_id: String,
+    thread_id: String,
+) -> Result<UserThread, AppError> {
+    let (client, user_id) = {
+        let servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let server = servers
+            .get(&server_id)
+            .ok_or_else(|| AppError::NotFound(format!("Server {} not found", server_id)))?;
+        let user_id = server
+            .current_user
+            .as_ref()
+            .map(|u| u.id.clone())
+            .ok_or_else(|| AppError::Auth("Not logged in".into()))?;
+        (server.client.clone(), user_id)
+    };
+
+    client.get_thread(&user_id, &team_id, &thread_id).await
 }
 
 #[tauri::command]

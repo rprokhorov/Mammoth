@@ -628,6 +628,22 @@ impl MattermostClient {
         Ok(threads)
     }
 
+    pub async fn get_thread(
+        &self,
+        user_id: &str,
+        team_id: &str,
+        thread_id: &str,
+    ) -> Result<crate::mattermost::types::UserThread, AppError> {
+        let resp = self
+            .get_authenticated(&format!(
+                "/users/{}/teams/{}/threads/{}",
+                user_id, team_id, thread_id
+            ))
+            .await?;
+        let thread = resp.json().await?;
+        Ok(thread)
+    }
+
     pub async fn follow_thread(
         &self,
         user_id: &str,

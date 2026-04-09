@@ -38,6 +38,9 @@ export const MessageItem = memo(function MessageItem({
   const [showPopover, setShowPopover] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [emojiPickerStyle, setEmojiPickerStyle] = useState<React.CSSProperties>({});
+  const [followLoading, setFollowLoading] = useState(false);
+  const userThreads = useThreadsStore((s) => s.userThreads);
+  const isFollowing = userThreads.find((t) => t.id === post.id)?.is_following ?? false;
   const avatarRef = useRef<HTMLDivElement>(null);
   const reactionBtnRef = useRef<HTMLButtonElement>(null);
 
@@ -75,6 +78,26 @@ export const MessageItem = memo(function MessageItem({
   function handleOpenThread() {
     const threadId = post.root_id || post.id;
     useThreadsStore.getState().setActiveThread(threadId);
+  }
+
+  async function handleToggleFollow(e: React.MouseEvent) {
+    e.stopPropagation();
+    if (!serverId || followLoading) return;
+    const teamId = useUiStore.getState().activeTeamId;
+    if (!teamId) return;
+    setFollowLoading(true);
+    try {
+      if (isFollowing) {
+        await invoke("unfollow_thread", { serverId, teamId, threadId: post.id });
+      } else {
+        await invoke("follow_thread", { serverId, teamId, threadId: post.id });
+      }
+      useThreadsStore.getState().updateThreadFollowing(post.id, !isFollowing);
+    } catch (e) {
+      console.error("Failed to toggle thread follow:", e);
+    } finally {
+      setFollowLoading(false);
+    }
   }
 
   async function handleAddReaction(emojiName: string) {
@@ -183,11 +206,21 @@ export const MessageItem = memo(function MessageItem({
 
         {/* Thread indicator */}
         {isThreadRoot && !hideThreadIndicator && (
-          <button className="thread-indicator" onClick={handleOpenThread}>
-            <span className="thread-indicator-count">
-              {post.reply_count} {post.reply_count === 1 ? "reply" : "replies"}
-            </span>
-          </button>
+          <div className="thread-indicator-row">
+            <button className="thread-indicator" onClick={handleOpenThread}>
+              <span className="thread-indicator-count">
+                {post.reply_count} {post.reply_count === 1 ? "reply" : "replies"}
+              </span>
+            </button>
+            <button
+              className={`thread-follow-btn ${isFollowing ? "following" : ""}`}
+              onClick={handleToggleFollow}
+              disabled={followLoading}
+              title={isFollowing ? "Unfollow thread" : "Follow thread"}
+            >
+              {isFollowing ? "Following" : "Follow"}
+            </button>
+          </div>
         )}
 
         {/* Action buttons */}

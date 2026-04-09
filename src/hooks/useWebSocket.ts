@@ -76,6 +76,12 @@ export function useWebSocket() {
         case "channel_viewed":
           handleChannelViewed(data);
           break;
+        case "thread_updated":
+          handleThreadUpdated(data);
+          break;
+        case "thread_follow_changed":
+          handleThreadFollowChanged(data);
+          break;
         default:
           console.debug("WS event:", eventType, data);
       }
@@ -232,6 +238,27 @@ function handleStatusChange(data: Record<string, unknown>) {
   const status = data.status as string;
   if (userId && status) {
     useUiStore.getState().setUserStatus(userId, status);
+  }
+}
+
+function handleThreadFollowChanged(data: Record<string, unknown>) {
+  const threadId = data.thread_id as string | undefined;
+  const state = data.state as boolean | undefined;
+  if (threadId !== undefined && state !== undefined) {
+    useThreadsStore.getState().updateThreadFollowing(threadId, state);
+  }
+}
+
+function handleThreadUpdated(data: Record<string, unknown>) {
+  try {
+    const threadStr = data.thread as string | undefined;
+    if (!threadStr) return;
+    const thread = JSON.parse(threadStr) as { id: string; is_following: boolean };
+    if (thread.id) {
+      useThreadsStore.getState().updateThreadFollowing(thread.id, thread.is_following);
+    }
+  } catch {
+    // ignore parse errors
   }
 }
 

@@ -46,6 +46,13 @@ export function ThreadPanel({ serverId, currentUserId, width }: ThreadPanelProps
     [threadOrderMap, activeThreadId],
   );
 
+  const userThreads = useThreadsStore((s) => s.userThreads);
+  const isFollowing = useMemo(
+    () => userThreads.find((t) => t.id === activeThreadId)?.is_following ?? false,
+    [userThreads, activeThreadId],
+  );
+  const [followLoading, setFollowLoading] = useState(false);
+
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [attachments, setAttachments] = useState<AttachedFile[]>([]);
@@ -103,7 +110,7 @@ export function ThreadPanel({ serverId, currentUserId, width }: ThreadPanelProps
         // Mark thread as read on the client immediately
         markThreadRead(activeThreadId);
 
-        // Mark thread as read on the server
+        // Mark thread as read on the server + fetch is_following
         const teamId = useUiStore.getState().activeTeamId;
         if (teamId) {
           invoke("mark_thread_as_read", {
@@ -112,6 +119,18 @@ export function ThreadPanel({ serverId, currentUserId, width }: ThreadPanelProps
             threadId: activeThreadId,
             timestamp: Date.now(),
           }).catch((e: unknown) => console.error("Failed to mark thread as read:", e));
+
+          invoke<{ id: string; is_following: boolean }>("get_thread", {
+            serverId,
+            teamId,
+            threadId: activeThreadId,
+          })
+            .then((t) => {
+              if (!cancelled) {
+                useThreadsStore.getState().updateThreadFollowing(t.id, t.is_following);
+              }
+            })
+            .catch(() => {/* non-critical */});
         }
       })
       .catch((e) => console.error("Failed to load thread:", e))
@@ -294,6 +313,25 @@ export function ThreadPanel({ serverId, currentUserId, width }: ThreadPanelProps
     }
   }
 
+  async function handleToggleFollow() {
+    if (!activeThreadId || followLoading) return;
+    const teamId = useUiStore.getState().activeTeamId;
+    if (!teamId) return;
+    setFollowLoading(true);
+    try {
+      if (isFollowing) {
+        await invoke("unfollow_thread", { serverId, teamId, threadId: activeThreadId });
+      } else {
+        await invoke("follow_thread", { serverId, teamId, threadId: activeThreadId });
+      }
+      useThreadsStore.getState().updateThreadFollowing(activeThreadId, !isFollowing);
+    } catch (e) {
+      console.error("Failed to toggle thread follow:", e);
+    } finally {
+      setFollowLoading(false);
+    }
+  }
+
   function handleClose() {
     useThreadsStore.getState().clearThread();
   }
@@ -327,6 +365,14 @@ export function ThreadPanel({ serverId, currentUserId, width }: ThreadPanelProps
           <span className="thread-title-text">Thread</span>
           <span className="thread-reply-count">{replyCount} {replyCount === 1 ? "reply" : "replies"}</span>
         </div>
+        <button
+          className={`thread-follow-btn ${isFollowing ? "following" : ""}`}
+          onClick={handleToggleFollow}
+          disabled={followLoading}
+          title={isFollowing ? "Unfollow thread" : "Follow thread"}
+        >
+          {isFollowing ? "Following" : "Follow"}
+        </button>
         <button className="thread-close-btn" onClick={handleClose} title="Close">
           ✕
         </button>

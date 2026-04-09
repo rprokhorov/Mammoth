@@ -1761,6 +1761,38 @@ button.secondary:hover:not(:disabled) {
   color: var(--text-muted);
 }
 
+.thread-follow-btn {
+  background: transparent;
+  border: 1px solid var(--text-muted);
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 500;
+  padding: 3px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-right: 6px;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.thread-follow-btn:hover:not(:disabled) {
+  border-color: var(--text-primary);
+  color: var(--text-primary);
+}
+
+.thread-follow-btn.following {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.thread-follow-btn.following:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.thread-follow-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 .thread-close-btn {
   background: transparent;
   border: none;
@@ -1820,6 +1852,23 @@ button.secondary:hover:not(:disabled) {
 }
 
 /* Thread indicator on messages */
+.thread-indicator-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.thread-indicator-row .thread-indicator {
+  margin-top: 0;
+}
+
+.thread-indicator-row .thread-follow-btn {
+  font-size: 11px;
+  padding: 2px 8px;
+  margin-right: 0;
+}
+
 .thread-indicator {
   display: inline-flex;
   align-items: center;
