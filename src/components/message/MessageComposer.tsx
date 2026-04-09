@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
+import { useTauriDragDrop } from "@/hooks/useTauriDragDrop";
 import { useMessagesStore, type PostData } from "@/stores/messagesStore";
 import { EMOJI_MAP, EmojiPicker } from "./EmojiPicker";
 
@@ -37,6 +38,7 @@ export function MessageComposer({ channelId, serverId }: MessageComposerProps) {
   const [emojiPickerStyle, setEmojiPickerStyle] = useState<React.CSSProperties>({});
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const emojiTriggerRef = useRef<HTMLButtonElement>(null);
+  const composerRef = useRef<HTMLDivElement>(null);
 
   const editingPostId = useMessagesStore((s) => s.editingPostId);
   const posts = useMessagesStore((s) => s.posts);
@@ -59,6 +61,12 @@ export function MessageComposer({ channelId, serverId }: MessageComposerProps) {
     setEditingPostId(null);
     textareaRef.current?.focus();
   }, [channelId]);
+
+  useTauriDragDrop(
+    composerRef,
+    (paths) => addFiles(paths.map((p) => ({ path: p, name: p.split(/[\\/]/).pop() ?? p }))),
+    setIsDragging,
+  );
 
   const adjustHeight = useCallback(() => {
     const ta = textareaRef.current;
@@ -192,29 +200,6 @@ export function MessageComposer({ channelId, serverId }: MessageComposerProps) {
     }
   }
 
-  function handleDragOver(e: React.DragEvent) {
-    e.preventDefault();
-    setIsDragging(true);
-  }
-
-  function handleDragLeave() {
-    setIsDragging(false);
-  }
-
-  async function handleDrop(e: React.DragEvent) {
-    e.preventDefault();
-    setIsDragging(false);
-    const files = Array.from(e.dataTransfer.files);
-    if (files.length === 0) return;
-    // In Tauri webview, dropped files have a path via webkitRelativePath or name
-    // We use the file name and read via Tauri dialog path
-    const fileInfos = files.map((f) => ({
-      path: (f as File & { path?: string }).path ?? f.name,
-      name: f.name,
-    }));
-    await addFiles(fileInfos);
-  }
-
   async function handlePaste(e: React.ClipboardEvent) {
     const items = Array.from(e.clipboardData.items);
     const imageItems = items.filter((item) => item.type.startsWith("image/"));
@@ -312,10 +297,8 @@ export function MessageComposer({ channelId, serverId }: MessageComposerProps) {
 
   return (
     <div
+      ref={composerRef}
       className={`message-composer ${editingPost ? "editing" : ""} ${isDragging ? "drag-over" : ""}`}
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-      onDrop={handleDrop}
     >
       {editingPost && (
         <div className="composer-edit-banner">

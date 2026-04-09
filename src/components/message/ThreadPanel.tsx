@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
+import { useTauriDragDrop } from "@/hooks/useTauriDragDrop";
 import { useThreadsStore } from "@/stores/threadsStore";
 import { useMessagesStore, type PostData } from "@/stores/messagesStore";
 import { useUiStore } from "@/stores/uiStore";
@@ -62,6 +63,7 @@ export function ThreadPanel({ serverId, currentUserId, width }: ThreadPanelProps
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const emojiTriggerRef = useRef<HTMLButtonElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const composerRef = useRef<HTMLDivElement>(null);
 
   // Load thread when activeThreadId changes and mark as read
   useEffect(() => {
@@ -150,6 +152,17 @@ export function ThreadPanel({ serverId, currentUserId, width }: ThreadPanelProps
     });
   }, [order.length]);
 
+  useTauriDragDrop(
+    composerRef,
+    (paths) => {
+      const rp = threadPosts[activeThreadId!] || useMessagesStore.getState().posts[activeThreadId!];
+      if (!rp) return;
+      addFiles(paths.map((p) => ({ path: p, name: p.split(/[\\/]/).pop() ?? p })), rp.channel_id);
+    },
+    setIsDragging,
+    !!activeThreadId,
+  );
+
   if (!activeThreadId) return null;
 
   const rootPost = threadPosts[activeThreadId] || useMessagesStore.getState().posts[activeThreadId];
@@ -233,25 +246,6 @@ export function ThreadPanel({ serverId, currentUserId, width }: ThreadPanelProps
         await addFiles([{ path: tmpPath, name: tmpName }], rootPost.channel_id);
       } catch { /* ignore */ }
     }
-  }
-
-  function handleDragOver(e: React.DragEvent) {
-    e.preventDefault();
-    setIsDragging(true);
-  }
-
-  function handleDragLeave() {
-    setIsDragging(false);
-  }
-
-  async function handleDrop(e: React.DragEvent) {
-    e.preventDefault();
-    setIsDragging(false);
-    const files = Array.from(e.dataTransfer.files);
-    if (files.length === 0) return;
-    const rootPost = threadPosts[activeThreadId!] || useMessagesStore.getState().posts[activeThreadId!];
-    if (!rootPost) return;
-    await addFiles(files.map((f) => ({ path: (f as File & { path?: string }).path ?? f.name, name: f.name })), rootPost.channel_id);
   }
 
   function removeAttachment(path: string) {
@@ -353,13 +347,9 @@ export function ThreadPanel({ serverId, currentUserId, width }: ThreadPanelProps
 
   return (
     <div
-      className={`thread-panel ${isDragging ? "drag-over" : ""}`}
+      className="thread-panel"
       style={width ? { width, minWidth: width } : undefined}
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-      onDrop={handleDrop}
     >
-      {isDragging && <div className="composer-drop-hint">Drop files to attach</div>}
       <div className="thread-panel-header">
         <div className="thread-panel-title">
           <span className="thread-title-text">Thread</span>
@@ -430,7 +420,11 @@ export function ThreadPanel({ serverId, currentUserId, width }: ThreadPanelProps
         )}
       </div>
 
-      <div className="thread-panel-composer">
+      <div
+        ref={composerRef}
+        className={`thread-panel-composer ${isDragging ? "drag-over" : ""}`}
+      >
+        {isDragging && <div className="composer-drop-hint">Drop files to attach</div>}
         {attachments.length > 0 && (
           <div className="composer-attachments">
             {attachments.map((att) => {
