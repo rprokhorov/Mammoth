@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useUiStore, type SidebarCategory } from "@/stores/uiStore";
 import { useMessagesStore } from "@/stores/messagesStore";
+import { primeLastViewedSnapshot } from "@/stores/lastViewedSnapshot";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { ServerSidebar } from "@/components/layout/ServerSidebar";
 import { ChannelList } from "@/components/layout/ChannelList";
@@ -510,6 +511,13 @@ function AppContent() {
 
   function handleSelectChannel(channelId: string) {
     const store = useUiStore.getState();
+    // Snapshot the channel's last_viewed_at BEFORE any view/read side effect.
+    // This frozen value drives the "first unread" scroll anchor in MessageList.
+    // Matches Mattermost webapp's `views.channel.lastChannelViewTime` behavior.
+    const ch = store.channels.find((c) => c.id === channelId);
+    if (ch) {
+      primeLastViewedSnapshot(channelId, ch.last_viewed_at);
+    }
     store.setActiveChannelId(channelId);
     store.setMainSubView("channels");
     // Navigate default tab to this channel (don't create a new tab)
@@ -524,14 +532,9 @@ function AppContent() {
       0,
     );
     invoke("set_badge_count", { count: totalMentions }).catch(() => {});
-    // Mark channel as viewed on the server
-    const serverId = store.activeServerId;
-    if (serverId) {
-      invoke("view_channel", {
-        serverId,
-        channelId,
-      }).catch(console.error);
-    }
+    // Note: view_channel is called by MessageList AFTER posts are loaded,
+    // so that we can first read the authoritative last_viewed_at to scroll
+    // to the first unread message.
   }
 
   if (loading) {

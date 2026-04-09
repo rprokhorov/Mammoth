@@ -2,11 +2,22 @@ import { useEffect, useRef, useCallback, useState, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useMessagesStore, type PostData } from "@/stores/messagesStore";
 import { useUiStore } from "@/stores/uiStore";
+import {
+  primeLastViewedSnapshot,
+  getLastViewedSnapshot,
+} from "@/stores/lastViewedSnapshot";
 import { MessageItem } from "./MessageItem";
 
 interface PostsResponse {
   order: string[];
   posts: Record<string, PostData>;
+}
+
+interface UnreadPostsResponse {
+  order: string[];
+  posts: Record<string, PostData>;
+  prev_post_id: string;
+  next_post_id: string;
 }
 
 interface MessageListProps {
@@ -43,6 +54,7 @@ export function MessageList({
   const [isNearBottom, setIsNearBottom] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const shouldPinToBottom = useRef(false);
+  const [unreadInfo, setUnreadInfo] = useState<{ firstUnreadId: string; count: number } | null>(null);
 
   const orderByChannel = useMessagesStore((s) => s.orderByChannel);
   const order = useMemo(() => orderByChannel[channelId] ?? EMPTY_ORDER, [orderByChannel, channelId]);
@@ -57,20 +69,69 @@ export function MessageList({
     setHasMore(true);
     setLoadError(null);
 
-    invoke<PostsResponse>("get_posts", {
+    // Reset unread banner for this channel open.
+    setUnreadInfo(null);
+
+    // Snapshot last_viewed_at from the client store (populated once at app
+    // startup by loadChannels and never overwritten by view_channel). Mirrors
+    // Mattermost webapp's frozen `views.channel.lastChannelViewTime` map.
+    const channelInfo = useUiStore.getState().channels.find((c) => c.id === channelId);
+    if (channelInfo) {
+      primeLastViewedSnapshot(channelId, channelInfo.last_viewed_at);
+    }
+    const lastViewedAt = getLastViewedSnapshot(channelId);
+
+    // Use the unread endpoint — it returns a chunk centered on the unread
+    // marker, so the first unread message is guaranteed to be in the chunk
+    // if one exists.
+    const loadPromise = invoke<UnreadPostsResponse>("get_posts_around_last_unread", {
       serverId,
       channelId,
-      page: 0,
-      perPage: POSTS_PER_PAGE,
-    })
-      .then((res) => {
+      limitBefore: 30,
+      limitAfter: 60,
+    }).then((res) => {
+      if (cancelled) return;
+      setChannelPosts(channelId, res.order, res.posts);
+      // prev_post_id === '' means we're at the oldest post in the channel.
+      if (res.prev_post_id === "") setHasMore(false);
+
+      // Compute unread info: first unread post + count of unread posts.
+      // Walk chronologically (oldest → newest).
+      let firstUnreadId: string | null = null;
+      let unreadCount = 0;
+      if (lastViewedAt > 0) {
+        const displayOrder = [...res.order].reverse();
+        for (const pid of displayOrder) {
+          const p = res.posts[pid];
+          if (!p || p.delete_at > 0 || p.root_id) continue;
+          // Skip system messages (joined/left/header changes/etc).
+          if (p.post_type && p.post_type.startsWith("system_")) continue;
+          if (p.create_at > lastViewedAt) {
+            if (!firstUnreadId) firstUnreadId = pid;
+            unreadCount++;
+          }
+        }
+      }
+
+      if (firstUnreadId && unreadCount > 0) {
+        setUnreadInfo({ firstUnreadId, count: unreadCount });
+      }
+
+      // Always scroll to the bottom (latest message) on channel open.
+      requestAnimationFrame(() => {
         if (cancelled) return;
-        setChannelPosts(channelId, res.order, res.posts);
-        if (res.order.length < POSTS_PER_PAGE) setHasMore(false);
         shouldPinToBottom.current = true;
         bottomRef.current?.scrollIntoView();
         setTimeout(() => { shouldPinToBottom.current = false; }, 2000);
-      })
+      });
+
+      // Mark channel as viewed on server AFTER posts are loaded. The
+      // last_viewed_at snapshot is frozen, so this won't affect the
+      // unread banner.
+      invoke("view_channel", { serverId, channelId }).catch(console.error);
+    });
+
+    loadPromise
       .catch((e) => {
         if (cancelled) return;
         console.error("Failed to load posts:", e);
@@ -209,7 +270,32 @@ export function MessageList({
   }, []);
 
   function scrollToBottom() {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    const el = scrollRef.current;
+    if (el) {
+      el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+    } else {
+      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+    setIsNearBottom(true);
+  }
+
+  function jumpToFirstUnread() {
+    if (!unreadInfo) return;
+    const container = scrollRef.current;
+    const el = container?.querySelector<HTMLElement>(
+      `[data-post-id="${unreadInfo.firstUnreadId}"]`,
+    );
+    if (container && el) {
+      // Disable auto-pin and mark as not-near-bottom BEFORE scrolling so
+      // the order.length / ResizeObserver effects don't yank us back down.
+      shouldPinToBottom.current = false;
+      setIsNearBottom(false);
+      // Use non-smooth scroll + explicit scrollTop to avoid intermediate
+      // scroll events re-triggering the near-bottom auto-scroll.
+      const targetTop = el.offsetTop - container.offsetTop;
+      container.scrollTop = targetTop;
+    }
+    setUnreadInfo(null);
   }
 
   // Build post list (order is newest-first from API, reverse for display)
@@ -299,6 +385,11 @@ export function MessageList({
 
   return (
     <div className="message-list-container">
+      {unreadInfo && (
+        <button className="unread-messages-top" onClick={jumpToFirstUnread}>
+          {unreadInfo.count} new {unreadInfo.count === 1 ? "message" : "messages"} ↑
+        </button>
+      )}
       <div className="message-list" ref={scrollRef} onScroll={handleScroll}>
         {loadingOlder && (
           <div className="loading-older">

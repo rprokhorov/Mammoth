@@ -178,6 +178,7 @@ Implemented in one pass:
 | 59 | «Open in Tab» в контекстном меню канала всегда создаёт новую вкладку, даже если канал уже открыт (в т.ч. является активным) | Готово | 1 |
 | 60 | При закрытии окна оно скрывается в трей (а не закрывается), иконка трея живёт всё время жизни приложения; клик на иконку в Dock открывает скрытое окно (RunEvent::Reopen) | Готово | 2 (первый фикс: сохранение TrayIcon через app.manage(); второй: Dock click — обработчик RunEvent::Reopen через .build().run(callback)) |
 | 61 | Кнопка Follow/Following в хедере ThreadPanel и рядом с "N replies" на корневом сообщении; синхронизация через WS событие thread_follow_changed (state + thread_id) | Готово | 3 (дефолт ?? true → ?? false; updateThreadFollowing upsert; WS событие называется thread_follow_changed, не thread_updated) |
+| 62 | При открытии канала скролл идёт на последнее сообщение; если есть непрочитанные, сверху появляется кнопка "N new messages ↑" — клик перематывает на первое непрочитанное. Системные сообщения и reply не учитываются. Снэпшот `last_viewed_at` замораживается в отдельной мапе как в webapp (views.channel.lastChannelViewTime), view_channel вызывается только после загрузки постов | Готово | 5 (гонка view_channel с get_posts; стейл msg_count в локальном сторе; get_posts_around_last_unread возвращал не те посты; скролл до first unread перебивался ResizeObserver; финальное решение — скролл вниз + top-banner кнопка) |
 
 ---
 

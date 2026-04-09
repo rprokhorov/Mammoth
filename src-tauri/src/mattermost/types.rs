@@ -145,6 +145,10 @@ pub struct CustomEmoji {
 pub struct PostList {
     pub order: Vec<String>,
     pub posts: std::collections::HashMap<String, Post>,
+    #[serde(default)]
+    pub prev_post_id: String,
+    #[serde(default)]
+    pub next_post_id: String,
 }
 
 // --- Threads ---

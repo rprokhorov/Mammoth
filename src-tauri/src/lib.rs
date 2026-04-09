@@ -131,11 +131,13 @@ pub fn run() {
             commands::get_channels_for_team,
             commands::get_channel,
             commands::view_channel,
+            commands::get_channel_last_viewed_at,
             commands::get_users_by_ids,
             commands::autocomplete_users,
             commands::search_users,
             // Messages
             commands::get_posts,
+            commands::get_posts_around_last_unread,
             commands::send_post,
             commands::edit_post,
             commands::delete_post,

@@ -11,6 +11,47 @@ pub struct PostsResponse {
     pub posts: std::collections::HashMap<String, Post>,
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub struct UnreadPostsResponse {
+    pub order: Vec<String>,
+    pub posts: std::collections::HashMap<String, Post>,
+    pub prev_post_id: String,
+    pub next_post_id: String,
+}
+
+#[tauri::command]
+pub async fn get_posts_around_last_unread(
+    state: State<'_, AppState>,
+    server_id: String,
+    channel_id: String,
+    limit_before: u32,
+    limit_after: u32,
+) -> Result<UnreadPostsResponse, AppError> {
+    let (client, user_id) = {
+        let servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let server = servers
+            .get(&server_id)
+            .ok_or_else(|| AppError::NotFound(format!("Server {} not found", server_id)))?;
+        let user_id = server
+            .current_user
+            .as_ref()
+            .map(|u| u.id.clone())
+            .ok_or_else(|| AppError::Auth("Not logged in".into()))?;
+        (server.client.clone(), user_id)
+    };
+
+    let post_list = client
+        .get_posts_around_last_unread(&user_id, &channel_id, limit_before, limit_after)
+        .await?;
+
+    Ok(UnreadPostsResponse {
+        order: post_list.order,
+        posts: post_list.posts,
+        prev_post_id: post_list.prev_post_id,
+        next_post_id: post_list.next_post_id,
+    })
+}
+
 #[tauri::command]
 pub async fn get_posts(
     state: State<'_, AppState>,

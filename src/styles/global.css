@@ -1477,6 +1477,28 @@ button.secondary:hover:not(:disabled) {
   background: var(--accent-hover);
 }
 
+/* Unread messages banner at top of channel */
+.unread-messages-top {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 6px 16px;
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  z-index: 10;
+}
+
+.unread-messages-top:hover {
+  background: var(--accent-hover);
+}
+
 /* Message Composer */
 .message-composer {
   border-top: 1px solid var(--border);

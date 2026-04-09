@@ -114,6 +114,28 @@ pub async fn get_channel(
 }
 
 #[tauri::command]
+pub async fn get_channel_last_viewed_at(
+    state: State<'_, AppState>,
+    server_id: String,
+    channel_id: String,
+) -> Result<i64, AppError> {
+    let (client, user_id) = {
+        let servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let server = servers
+            .get(&server_id)
+            .ok_or_else(|| AppError::NotFound(format!("Server {} not found", server_id)))?;
+        let user_id = server
+            .current_user
+            .as_ref()
+            .map(|u| u.id.clone())
+            .ok_or_else(|| AppError::Auth("Not logged in".into()))?;
+        (server.client.clone(), user_id)
+    };
+
+    client.get_channel_member_last_viewed(&channel_id, &user_id).await
+}
+
+#[tauri::command]
 pub async fn view_channel(
     state: State<'_, AppState>,
     server_id: String,

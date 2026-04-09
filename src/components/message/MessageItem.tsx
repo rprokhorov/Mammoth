@@ -61,7 +61,7 @@ export const MessageItem = memo(function MessageItem({
 
   if (isSystem) {
     return (
-      <div className="message-item system-message">
+      <div className="message-item system-message" data-post-id={post.id}>
         <div className="message-content-area">
           <span className="system-text">{post.message}</span>
         </div>
@@ -154,7 +154,7 @@ export const MessageItem = memo(function MessageItem({
   }
 
   return (
-    <div className={`message-item ${showAvatar ? "" : "continuation"} ${post.is_pinned ? "pinned" : ""}`}>
+    <div className={`message-item ${showAvatar ? "" : "continuation"} ${post.is_pinned ? "pinned" : ""}`} data-post-id={post.id}>
       {showAvatar ? (
         <div
           className="message-avatar clickable"

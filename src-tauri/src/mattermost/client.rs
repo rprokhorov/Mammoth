@@ -389,6 +389,23 @@ impl MattermostClient {
         Ok(posts)
     }
 
+    pub async fn get_posts_around_last_unread(
+        &self,
+        user_id: &str,
+        channel_id: &str,
+        limit_before: u32,
+        limit_after: u32,
+    ) -> Result<PostList, AppError> {
+        let resp = self
+            .get_authenticated(&format!(
+                "/users/{}/channels/{}/posts/unread?limit_before={}&limit_after={}&skipFetchThreads=false",
+                user_id, channel_id, limit_before, limit_after
+            ))
+            .await?;
+        let posts: PostList = resp.json().await?;
+        Ok(posts)
+    }
+
     pub async fn create_post(
         &self,
         channel_id: &str,
@@ -1200,6 +1217,18 @@ impl MattermostClient {
             return Err(AppError::Api { status, message: msg });
         }
         Ok(())
+    }
+
+    pub async fn get_channel_member_last_viewed(
+        &self,
+        channel_id: &str,
+        user_id: &str,
+    ) -> Result<i64, AppError> {
+        let resp = self
+            .get_authenticated(&format!("/channels/{}/members/{}", channel_id, user_id))
+            .await?;
+        let member: serde_json::Value = resp.json().await?;
+        Ok(member.get("last_viewed_at").and_then(|v| v.as_i64()).unwrap_or(0))
     }
 
     // --- Channel Notify Props ---
