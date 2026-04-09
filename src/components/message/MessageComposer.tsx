@@ -267,6 +267,7 @@ export function MessageComposer({ channelId, serverId }: MessageComposerProps) {
       }
       setText("");
       setAttachments([]);
+      if (textareaRef.current) textareaRef.current.style.height = "auto";
     } catch (e) {
       console.error("Failed to send:", e);
     } finally {
@@ -290,6 +291,7 @@ export function MessageComposer({ channelId, serverId }: MessageComposerProps) {
   function cancelEdit() {
     setEditingPostId(null);
     setText("");
+    if (textareaRef.current) textareaRef.current.style.height = "auto";
     textareaRef.current?.focus();
   }
 

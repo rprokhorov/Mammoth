@@ -274,6 +274,7 @@ export function ThreadPanel({ serverId, currentUserId, width }: ThreadPanelProps
   function cancelEdit() {
     setEditingPostId(null);
     setText("");
+    if (textareaRef.current) textareaRef.current.style.height = "auto";
   }
 
   async function handleSend() {
@@ -307,6 +308,7 @@ export function ThreadPanel({ serverId, currentUserId, width }: ThreadPanelProps
       }
       setText("");
       setAttachments([]);
+      if (textareaRef.current) textareaRef.current.style.height = "auto";
     } catch (e) {
       console.error("Failed to send reply:", e);
     } finally {
