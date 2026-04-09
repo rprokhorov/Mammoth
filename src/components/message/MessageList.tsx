@@ -2,6 +2,7 @@ import { useEffect, useRef, useCallback, useState, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useMessagesStore, type PostData } from "@/stores/messagesStore";
 import { useUiStore } from "@/stores/uiStore";
+import { useThreadsStore } from "@/stores/threadsStore";
 import {
   primeLastViewedSnapshot,
   getLastViewedSnapshot,
@@ -30,6 +31,37 @@ interface MessageListProps {
 const POSTS_PER_PAGE = 30;
 const GROUP_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
 const EMPTY_ORDER: string[] = [];
+
+function fetchThreadParticipants(rawRootIds: string[], serverId: string) {
+  // Defer to let store settle after setChannelPosts/prependOlderPosts
+  setTimeout(() => {
+    const { threadParticipants } = useThreadsStore.getState();
+    const allPosts = useMessagesStore.getState().posts;
+    // Also include any posts in store with reply_count computed from replies
+    const ids = new Set(rawRootIds);
+    for (const p of Object.values(allPosts)) {
+      if (!p.root_id && (p.reply_count ?? 0) > 0) ids.add(p.id);
+    }
+    for (const rootId of ids) {
+      if (threadParticipants[rootId]) continue;
+      invoke<PostsResponse>("get_post_thread", { serverId, postId: rootId })
+        .then((threadRes) => {
+          const seen = new Set<string>();
+          const result: string[] = [];
+          const sorted = Object.values(threadRes.posts).sort((a, b) => a.create_at - b.create_at);
+          for (const p of sorted) {
+            if (!seen.has(p.user_id)) {
+              seen.add(p.user_id);
+              result.push(p.user_id);
+              if (result.length === 3) break;
+            }
+          }
+          useThreadsStore.getState().setThreadParticipants(rootId, result);
+        })
+        .catch(() => {});
+    }
+  }, 0);
+}
 
 function getMessagesActions() {
   const s = useMessagesStore.getState();
@@ -115,6 +147,14 @@ export function MessageList({
 
       if (firstUnreadId && unreadCount > 0) {
         setUnreadInfo({ firstUnreadId, count: unreadCount });
+      }
+
+      // Background: load thread participants for root posts with replies.
+      if (!cancelled) {
+        fetchThreadParticipants(
+          Object.values(res.posts).filter((p) => !p.root_id && (p.reply_count ?? 0) > 0).map((p) => p.id),
+          serverId,
+        );
       }
 
       // Always scroll to the bottom (latest message) on channel open.
@@ -236,6 +276,11 @@ export function MessageList({
 
       getMessagesActions().prependOlderPosts(channelId, res.order, res.posts);
       if (res.order.length < POSTS_PER_PAGE) setHasMore(false);
+
+      fetchThreadParticipants(
+        Object.values(res.posts).filter((p) => !p.root_id && (p.reply_count ?? 0) > 0).map((p) => p.id),
+        serverId,
+      );
 
       // Maintain scroll position after prepending
       requestAnimationFrame(() => {

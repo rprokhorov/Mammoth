@@ -1947,6 +1947,23 @@ button.secondary:hover:not(:disabled) {
   text-decoration: underline;
 }
 
+.thread-indicator-avatars {
+  display: flex;
+  align-items: center;
+}
+
+.thread-participant-avatar {
+  border-radius: 50%;
+  border: 1.5px solid var(--bg-primary);
+  margin-right: -4px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.thread-indicator-avatars + .thread-indicator-count {
+  margin-left: 8px;
+}
+
 /* Threads View */
 .threads-view {
   flex: 1;

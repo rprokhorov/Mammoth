@@ -1,4 +1,5 @@
 import { memo } from "react";
+import type React from "react";
 import { useUserAvatar } from "@/hooks/useUserAvatar";
 
 interface UserAvatarProps {
@@ -6,7 +7,7 @@ interface UserAvatarProps {
   username: string;
   size?: number;
   className?: string;
-  onClick?: () => void;
+  onClick?: (e: React.MouseEvent<HTMLElement>) => void;
 }
 
 export const UserAvatar = memo(function UserAvatar({

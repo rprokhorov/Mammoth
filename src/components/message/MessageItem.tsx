@@ -36,10 +36,12 @@ export const MessageItem = memo(function MessageItem({
   const users = useUiStore((s) => s.users);
   const user = users[post.user_id];
   const [showPopover, setShowPopover] = useState(false);
+  const [participantPopover, setParticipantPopover] = useState<{ userId: string; anchor: HTMLElement } | null>(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [emojiPickerStyle, setEmojiPickerStyle] = useState<React.CSSProperties>({});
   const [followLoading, setFollowLoading] = useState(false);
   const userThreads = useThreadsStore((s) => s.userThreads);
+  const cachedParticipants = useThreadsStore((s) => s.threadParticipants[post.id]);
   const isFollowing = userThreads.find((t) => t.id === post.id)?.is_following ?? false;
   const avatarRef = useRef<HTMLDivElement>(null);
   const reactionBtnRef = useRef<HTMLButtonElement>(null);
@@ -57,6 +59,30 @@ export const MessageItem = memo(function MessageItem({
   const isSystem = post.post_type !== "" && post.post_type !== undefined;
   const hasReplies = (post.reply_count ?? 0) > 0 && !post.root_id;
   const isThreadRoot = !post.root_id && hasReplies;
+
+  const threadParticipants: Array<{ id: string }> = (() => {
+    if (!isThreadRoot) return [];
+    // 1. Reactive cached participants loaded in background by MessageList
+    if (cachedParticipants && cachedParticipants.length > 0)
+      return cachedParticipants.slice(0, 3).map((id) => ({ id }));
+    const store = useThreadsStore.getState();
+    // 2. Participants from userThreads (subscribed threads)
+    const fromUserThreads = store.userThreads.find((t) => t.id === post.id)?.participants ?? [];
+    if (fromUserThreads.length > 0) return fromUserThreads.slice(0, 3);
+    // 3. Fallback: derive from loaded thread posts
+    const order = store.threadOrder[post.id] ?? [];
+    const seen = new Set<string>();
+    const result: Array<{ id: string }> = [];
+    for (const pid of order) {
+      const p = store.threadPosts[pid];
+      if (p && !seen.has(p.user_id)) {
+        seen.add(p.user_id);
+        result.push({ id: p.user_id });
+        if (result.length === 3) break;
+      }
+    }
+    return result;
+  })();
   const reactions = post.metadata?.reactions || [];
 
   if (isSystem) {
@@ -208,6 +234,25 @@ export const MessageItem = memo(function MessageItem({
         {isThreadRoot && !hideThreadIndicator && (
           <div className="thread-indicator-row">
             <button className="thread-indicator" onClick={handleOpenThread}>
+              {threadParticipants.length > 0 && (
+                <span className="thread-indicator-avatars" onClick={(e) => e.stopPropagation()}>
+                  {threadParticipants.map((p) => {
+                    const u = useUiStore.getState().users[p.id];
+                    return (
+                      <UserAvatar
+                        key={p.id}
+                        userId={p.id}
+                        username={u?.username ?? p.id}
+                        size={18}
+                        className="thread-participant-avatar"
+                        onClick={(e: React.MouseEvent<HTMLElement>) => {
+                          setParticipantPopover({ userId: p.id, anchor: e.currentTarget });
+                        }}
+                      />
+                    );
+                  })}
+                </span>
+              )}
               <span className="thread-indicator-count">
                 {post.reply_count} {post.reply_count === 1 ? "reply" : "replies"}
               </span>
@@ -304,6 +349,15 @@ export const MessageItem = memo(function MessageItem({
           serverId={serverId}
           anchorEl={avatarRef.current}
           onClose={() => setShowPopover(false)}
+        />
+      )}
+
+      {participantPopover && serverId && (
+        <UserPopover
+          userId={participantPopover.userId}
+          serverId={serverId}
+          anchorEl={participantPopover.anchor}
+          onClose={() => setParticipantPopover(null)}
         />
       )}
     </div>

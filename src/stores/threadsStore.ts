@@ -20,6 +20,8 @@ interface ThreadsState {
   threadOrder: Record<string, string[]>;
   // All thread posts by id (shares with messagesStore.posts for root)
   threadPosts: Record<string, PostData>;
+  // Participant user IDs per thread root post id (max 3, for avatar display)
+  threadParticipants: Record<string, string[]>;
   // User's followed threads list
   userThreads: UserThread[];
   userThreadsTotal: number;
@@ -29,6 +31,7 @@ interface ThreadsState {
 
   setActiveThread: (threadId: string | null) => void;
   setThreadData: (rootId: string, order: string[], posts: Record<string, PostData>) => void;
+  setThreadParticipants: (rootId: string, userIds: string[]) => void;
   addThreadReply: (post: PostData) => void;
   updateThreadPost: (post: PostData) => void;
   removeThreadPost: (postId: string, rootId: string) => void;
@@ -44,12 +47,18 @@ export const useThreadsStore = create<ThreadsState>((set) => ({
   activeThreadId: null,
   threadOrder: {},
   threadPosts: {},
+  threadParticipants: {},
   userThreads: [],
   userThreadsTotal: 0,
   userThreadsUnread: 0,
   threadLoading: false,
 
   setActiveThread: (threadId) => set({ activeThreadId: threadId }),
+
+  setThreadParticipants: (rootId, userIds) =>
+    set((state) => ({
+      threadParticipants: { ...state.threadParticipants, [rootId]: userIds },
+    })),
 
   setThreadData: (rootId, order, posts) =>
     set((state) => ({
