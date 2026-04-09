@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useThreadsStore, type UserThread } from "@/stores/threadsStore";
 import { useUiStore } from "@/stores/uiStore";
+import { useTabsStore } from "@/stores/tabsStore";
+import { primeLastViewedSnapshot } from "@/stores/lastViewedSnapshot";
 
 interface UserThreadListResponse {
   threads: UserThread[];
@@ -13,9 +15,10 @@ interface UserThreadListResponse {
 interface ThreadsViewProps {
   serverId: string;
   teamId: string;
+  currentUserId: string | null;
 }
 
-export function ThreadsView({ serverId, teamId }: ThreadsViewProps) {
+export function ThreadsView({ serverId, teamId, currentUserId }: ThreadsViewProps) {
   const userThreads = useThreadsStore((s) => s.userThreads);
   const userThreadsUnread = useThreadsStore((s) => s.userThreadsUnread);
   const activeThreadId = useThreadsStore((s) => s.activeThreadId);
@@ -57,6 +60,36 @@ export function ThreadsView({ serverId, teamId }: ThreadsViewProps) {
     : userThreads;
 
   const users = useUiStore.getState().users;
+
+  function getChannelLabel(channelId: string): string | null {
+    const store = useUiStore.getState();
+    const ch = store.channels.find((c) => c.id === channelId);
+    if (!ch) return null;
+    if (ch.channel_type === "D") {
+      const parts = ch.name.split("__");
+      for (const part of parts) {
+        if (part === currentUserId) continue;
+        const u = store.users[part];
+        if (u) return u.nickname || `${u.first_name} ${u.last_name}`.trim() || u.username;
+      }
+      for (const part of parts) {
+        const u = store.users[part];
+        if (u) return u.nickname || `${u.first_name} ${u.last_name}`.trim() || u.username;
+      }
+      return ch.display_name || "Direct Message";
+    }
+    return `# ${ch.display_name || ch.name}`;
+  }
+
+  function handleGoToChannel(e: React.MouseEvent, channelId: string) {
+    e.stopPropagation();
+    const uiStore = useUiStore.getState();
+    const ch = uiStore.channels.find((c) => c.id === channelId);
+    if (ch) primeLastViewedSnapshot(ch.id, ch.last_viewed_at);
+    uiStore.setActiveChannelId(channelId);
+    uiStore.setMainSubView("channels");
+    useTabsStore.getState().navigateDefaultTab(channelId);
+  }
 
   return (
     <div className="threads-view">
@@ -120,7 +153,21 @@ export function ThreadsView({ serverId, teamId }: ThreadsViewProps) {
                 </div>
                 <div className="thread-list-content">
                   <div className="thread-list-header">
-                    <span className="thread-list-author">{authorName}</span>
+                    <div className="thread-list-author-row">
+                      <span className="thread-list-author">{authorName}</span>
+                      {(() => {
+                        const label = getChannelLabel(post.channel_id);
+                        return label ? (
+                          <button
+                            className="thread-channel-btn wide"
+                            onClick={(e) => handleGoToChannel(e, post.channel_id)}
+                            title={`Go to ${label}`}
+                          >
+                            {label}
+                          </button>
+                        ) : null;
+                      })()}
+                    </div>
                     <span className="thread-list-time">{timeStr}</span>
                   </div>
                   <div className="thread-list-preview">

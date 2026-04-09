@@ -1814,6 +1814,10 @@ button.secondary:hover:not(:disabled) {
   color: var(--text-primary);
 }
 
+.thread-channel-btn.wide {
+  max-width: 200px;
+}
+
 .thread-follow-btn {
   background: transparent;
   border: 1px solid var(--text-muted);
@@ -2053,9 +2057,17 @@ button.secondary:hover:not(:disabled) {
   margin-bottom: 2px;
 }
 
+.thread-list-author-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+
 .thread-list-author {
   font-weight: 600;
   font-size: 13px;
+  flex-shrink: 0;
 }
 
 .thread-list-time {

@@ -616,7 +616,7 @@ function AppContent() {
               <TabBar onSelectChannel={handleSelectChannel} currentUserId={currentUserId} />
               <div className="message-area">
                 {mainSubView === "threads" && activeServerId && activeTeamId ? (
-                  <ThreadsView serverId={activeServerId} teamId={activeTeamId} />
+                  <ThreadsView serverId={activeServerId} teamId={activeTeamId} currentUserId={currentUserId} />
                 ) : activeChannel && activeServerId ? (
                   <>
                     <MessageList

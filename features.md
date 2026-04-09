@@ -183,6 +183,7 @@ Implemented in one pass:
 | 62 | При открытии канала скролл идёт на последнее сообщение; если есть непрочитанные, сверху появляется кнопка "N new messages ↑" — клик перематывает на первое непрочитанное. Системные сообщения и reply не учитываются. Снэпшот `last_viewed_at` замораживается в отдельной мапе как в webapp (views.channel.lastChannelViewTime), view_channel вызывается только после загрузки постов | Готово | 5 (гонка view_channel с get_posts; стейл msg_count в локальном сторе; get_posts_around_last_unread возвращал не те посты; скролл до first unread перебивался ResizeObserver; финальное решение — скролл вниз + top-banner кнопка) |
 | 65 | Редактирование сообщений в панели тредов: кнопка Edit на сообщениях, banner "Editing message" в composer, отмена по кнопке Cancel или Escape, вызов edit_post вместо send_post | Готово | 1 |
 | 66 | В шапке ThreadPanel кнопка с именем канала (для DM — имя собеседника: nickname / First Last / username); клик переходит в канал; цвет кнопки совпадает с кнопкой Follow | Готово | 1 |
+| 67 | В списке Threads View кнопка с именем канала после имени автора (для DM — ФИО/nickname собеседника, для каналов — # name); ширина 200px в ThreadsView, 120px в ThreadPanel | Готово | 1 |
 
 ---
 
