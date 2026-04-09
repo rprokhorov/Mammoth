@@ -665,7 +665,7 @@ export function ChannelList({ onSelectChannel, onCreateChannel, serverId, curren
             <button
               className="context-menu-item"
               onClick={() => {
-                useTabsStore.getState().openTab(contextMenu.channelId);
+                useTabsStore.getState().openNewTab(contextMenu.channelId);
                 onSelectChannel(contextMenu.channelId);
                 setContextMenu(null);
               }}
