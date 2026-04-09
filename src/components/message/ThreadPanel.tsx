@@ -60,10 +60,17 @@ export function ThreadPanel({ serverId, currentUserId, width }: ThreadPanelProps
   const [isDragging, setIsDragging] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [emojiPickerStyle, setEmojiPickerStyle] = useState<React.CSSProperties>({});
+  const [editingPostId, setEditingPostId] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const emojiTriggerRef = useRef<HTMLButtonElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const composerRef = useRef<HTMLDivElement>(null);
+
+  // Reset edit state when thread changes
+  useEffect(() => {
+    setEditingPostId(null);
+    setText("");
+  }, [activeThreadId]);
 
   // Load thread when activeThreadId changes and mark as read
   useEffect(() => {
@@ -252,6 +259,21 @@ export function ThreadPanel({ serverId, currentUserId, width }: ThreadPanelProps
     setAttachments((prev) => prev.filter((a) => a.path !== path));
   }
 
+  function handleEditPost(postId: string) {
+    const post = threadPosts[postId] || useMessagesStore.getState().posts[postId];
+    if (!post) return;
+    setEditingPostId(postId);
+    setText(post.message);
+    requestAnimationFrame(() => {
+      textareaRef.current?.focus();
+    });
+  }
+
+  function cancelEdit() {
+    setEditingPostId(null);
+    setText("");
+  }
+
   async function handleSend() {
     const trimmed = text.trim();
     const readyFileIds = attachments.filter((a) => a.fileId).map((a) => a.fileId!);
@@ -260,16 +282,27 @@ export function ThreadPanel({ serverId, currentUserId, width }: ThreadPanelProps
 
     setSending(true);
     try {
-      const rootPost = threadPosts[activeThreadId!] || useMessagesStore.getState().posts[activeThreadId!];
-      const newPost = await invoke<PostData>("send_post", {
-        serverId,
-        channelId: rootPost?.channel_id ?? "",
-        message: trimmed,
-        rootId: activeThreadId,
-        fileIds: readyFileIds.length > 0 ? readyFileIds : undefined,
-      });
-      useThreadsStore.getState().addThreadReply(newPost);
-      useMessagesStore.getState().addPost(newPost);
+      if (editingPostId) {
+        const updated = await invoke<PostData>("edit_post", {
+          serverId,
+          postId: editingPostId,
+          message: trimmed,
+        });
+        useThreadsStore.getState().updateThreadPost(updated);
+        useMessagesStore.getState().updatePost(updated);
+        setEditingPostId(null);
+      } else {
+        const rootPost = threadPosts[activeThreadId!] || useMessagesStore.getState().posts[activeThreadId!];
+        const newPost = await invoke<PostData>("send_post", {
+          serverId,
+          channelId: rootPost?.channel_id ?? "",
+          message: trimmed,
+          rootId: activeThreadId,
+          fileIds: readyFileIds.length > 0 ? readyFileIds : undefined,
+        });
+        useThreadsStore.getState().addThreadReply(newPost);
+        useMessagesStore.getState().addPost(newPost);
+      }
       setText("");
       setAttachments([]);
     } catch (e) {
@@ -303,7 +336,11 @@ export function ThreadPanel({ serverId, currentUserId, width }: ThreadPanelProps
       handleSend();
     }
     if (e.key === "Escape") {
-      useThreadsStore.getState().clearThread();
+      if (editingPostId) {
+        cancelEdit();
+      } else {
+        useThreadsStore.getState().clearThread();
+      }
     }
   }
 
@@ -381,7 +418,7 @@ export function ThreadPanel({ serverId, currentUserId, width }: ThreadPanelProps
                 <MessageItem
                   post={rootPost}
                   showAvatar={true}
-                  onEdit={() => {}}
+                  onEdit={handleEditPost}
                   onDelete={() => {}}
                   currentUserId={currentUserId}
                   serverId={serverId}
@@ -407,7 +444,7 @@ export function ThreadPanel({ serverId, currentUserId, width }: ThreadPanelProps
                     key={post.id}
                     post={post}
                     showAvatar={true}
-                    onEdit={() => {}}
+                    onEdit={handleEditPost}
                     onDelete={() => {}}
                     currentUserId={currentUserId}
                     serverId={serverId}
@@ -424,6 +461,12 @@ export function ThreadPanel({ serverId, currentUserId, width }: ThreadPanelProps
         ref={composerRef}
         className={`thread-panel-composer ${isDragging ? "drag-over" : ""}`}
       >
+        {editingPostId && (
+          <div className="composer-edit-banner">
+            Editing message
+            <button className="cancel-edit" onClick={cancelEdit}>Cancel</button>
+          </div>
+        )}
         {isDragging && <div className="composer-drop-hint">Drop files to attach</div>}
         {attachments.length > 0 && (
           <div className="composer-attachments">
