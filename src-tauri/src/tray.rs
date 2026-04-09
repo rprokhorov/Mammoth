@@ -30,7 +30,7 @@ pub fn create_tray(app: &AppHandle) -> tauri::Result<()> {
     let (rgba, width, height) = load_png_as_rgba(include_bytes!("../icons/32x32.png"));
     let icon = Image::new_owned(rgba, width, height);
 
-    let _tray = TrayIconBuilder::with_id("main-tray")
+    let tray = TrayIconBuilder::with_id("main-tray")
         .icon(icon)
         .menu(&menu)
         .tooltip("Mattermost Desktop")
@@ -64,6 +64,8 @@ pub fn create_tray(app: &AppHandle) -> tauri::Result<()> {
             }
         })
         .build(app)?;
+
+    app.manage(tray);
 
     Ok(())
 }
