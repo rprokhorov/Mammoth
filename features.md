@@ -189,6 +189,7 @@ Implemented in one pass:
 | 70 | При перетаскивании уже открытого канала в TabBar — активируется существующий таб вместо создания дубликата | Готово | 1 |
 | 71 | Рендеринг Mattermost interactive messages (attachments) в чате и тредах: цветная полоса, автор, заголовок, текст, поля, изображения, футер, кнопки (button/select со стилями) — клик по кнопке вызывает POST /posts/{id}/actions/{actionId} | Готово | 2 (первая попытка не учитывала encodeURIComponent(actionId), metadata.embeds для определения типа, disabled у actions) |
 | 72 | Поддержка slash-команд: автокомплит при вводе `/` в поле ввода (dropdown с trigger/hint/description), навигация стрелками, Tab/Enter для выбора, Escape для закрытия; отправка команды через POST /api/v4/commands/execute вместо /posts | Готово | 4 (неверный URL /commands/autocomplete_suggestions → /teams/{id}/commands/autocomplete_suggestions; структура ответа AutocompleteSuggestion с PascalCase полями вместо ожидаемой Command; поля десериализовались в snake_case но приходили как PascalCase из Tauri; regex не матчил `/cmd args` с пробелом) |
+| 73 | Интерактивные диалоги (open_dialog) от slash-команд: парсинг WS-события open_dialog (dialog как JSON-строка), guard на elements в App.tsx; ephemeral_message через WS отображается в чате как обычный пост с кнопками; исправлены стили checkbox/radio (margin: 0, явный size 16px); overflow-x: hidden на модалке | Готово | 3 (trigger_id/url брались из вложенного dialog вместо data; WS-путь конфликтовал с polling; ephemeral_message был unhandled) |
 
 ---
 

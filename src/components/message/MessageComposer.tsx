@@ -303,11 +303,57 @@ export function MessageComposer({ channelId, serverId }: MessageComposerProps) {
         updatePost(updated);
         setEditingPostId(null);
       } else if (trimmed.startsWith("/") && readyFileIds.length === 0) {
-        await invoke("execute_slash_command", {
+        const slashResult = await invoke<Record<string, unknown>>("execute_slash_command", {
           serverId,
           channelId,
+          teamId: activeTeamId ?? null,
           command: trimmed,
         });
+        // If response contains trigger_id, wait for WS open_dialog event (buffered in Rust)
+        const triggerId = slashResult?.trigger_id as string | undefined;
+        if (triggerId) {
+          const { emit } = await import("@tauri-apps/api/event");
+          // Poll the Rust buffer for up to 3s (WS event may arrive shortly after)
+          let found = false;
+          for (let i = 0; i < 10; i++) {
+            await new Promise((r) => setTimeout(r, 300));
+            const dialogPayload = await invoke<Record<string, unknown> | null>("poll_dialog", { triggerId });
+            if (dialogPayload) {
+              // dialog field may be a JSON string in WS event data
+              let parsedDialog: unknown = dialogPayload.dialog;
+              if (typeof parsedDialog === "string") {
+                try { parsedDialog = JSON.parse(parsedDialog); } catch { /* use as-is */ }
+              }
+              if (!parsedDialog) parsedDialog = dialogPayload;
+              // Unwrap nested { dialog: {...} } if needed
+              const pd = parsedDialog as Record<string, unknown>;
+              if (!Array.isArray(pd.elements) && pd.dialog && typeof pd.dialog === "object") {
+                parsedDialog = pd.dialog;
+              }
+              emit("interactive_dialog_open", {
+                serverId,
+                triggerId,
+                url: dialogPayload.url ?? "",
+                dialog: parsedDialog,
+              });
+              found = true;
+              break;
+            }
+          }
+          // Fallback: try fetching via API directly
+          if (!found) {
+            const apiResult = await invoke<Record<string, unknown>>("fetch_dialog_by_trigger", { serverId, triggerId });
+            console.log("fetch_dialog_by_trigger result:", JSON.stringify(apiResult));
+            if (apiResult && apiResult.dialog) {
+              emit("interactive_dialog_open", {
+                serverId,
+                triggerId,
+                url: apiResult.url ?? "",
+                dialog: apiResult.dialog,
+              });
+            }
+          }
+        }
       } else {
         const newPost = await invoke<PostData>("send_post", {
           serverId,

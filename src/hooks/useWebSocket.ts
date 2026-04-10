@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
+import { listen, emit } from "@tauri-apps/api/event";
 import {
   isPermissionGranted,
   requestPermission,
@@ -82,8 +82,14 @@ export function useWebSocket() {
         case "thread_follow_changed":
           handleThreadFollowChanged(data);
           break;
+        case "ephemeral_message":
+          handleEphemeralMessage(data, broadcast);
+          break;
+        case "open_dialog":
+          handleOpenDialog(data, server_id);
+          break;
         default:
-          console.debug("WS event:", eventType, data);
+          console.log("WS event (unhandled):", eventType, JSON.stringify(data));
       }
     });
 
@@ -269,4 +275,61 @@ function handleChannelViewed(data: Record<string, unknown>) {
   const { updateChannelMentions } = useUiStore.getState();
   updateChannelMentions(channelId, 0, 0);
   updateBadgeCount();
+}
+
+function handleEphemeralMessage(
+  data: Record<string, unknown>,
+  broadcast: { channel_id: string },
+) {
+  try {
+    const postStr = data.post as string | undefined;
+    if (!postStr) return;
+    const post = JSON.parse(postStr) as PostData;
+    // Use broadcast channel_id if post doesn't have one
+    if (!post.channel_id && broadcast.channel_id) {
+      post.channel_id = broadcast.channel_id;
+    }
+    if (!post.channel_id) return;
+    // Ephemeral posts are added to the channel feed just like regular posts
+    useMessagesStore.getState().addPost(post);
+  } catch {
+    // ignore parse errors
+  }
+}
+
+function handleOpenDialog(data: Record<string, unknown>, serverId: string) {
+  console.log("open_dialog WS event data:", JSON.stringify(data));
+  try {
+    // trigger_id and url are always at the top level of data
+    const triggerId = (data.trigger_id as string | undefined) ?? "";
+    const url = (data.url as string | undefined) ?? "";
+
+    // dialog field may be a JSON string (Mattermost standard) or already an object
+    let dialog: unknown = null;
+    if (typeof data.dialog === "string") {
+      dialog = JSON.parse(data.dialog);
+    } else if (data.dialog && typeof data.dialog === "object") {
+      dialog = data.dialog;
+    }
+
+    if (!dialog) {
+      console.log("open_dialog: no dialog field in payload");
+      return;
+    }
+
+    // Unwrap nested { dialog: {...} } if elements not at top level
+    const dialogObj = dialog as Record<string, unknown>;
+    if (!Array.isArray(dialogObj.elements) && dialogObj.dialog && typeof dialogObj.dialog === "object") {
+      dialog = dialogObj.dialog;
+    }
+
+    emit("interactive_dialog_open", {
+      serverId,
+      triggerId,
+      url,
+      dialog,
+    });
+  } catch (e) {
+    console.error("open_dialog parse error:", e);
+  }
 }

@@ -3149,6 +3149,144 @@ button.secondary:hover:not(:disabled) {
   flex: 1;
 }
 
+/* ===== Interactive Dialog Modal ===== */
+.interactive-dialog-modal {
+  width: 560px;
+  max-width: 95vw;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden;
+}
+.interactive-dialog-modal .modal-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.dialog-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  object-fit: contain;
+}
+.dialog-body {
+  padding: 20px;
+  overflow-y: auto;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.dialog-intro {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+.dialog-generic-error {
+  background: rgba(var(--red-rgb, 210, 75, 78), 0.1);
+  border: 1px solid var(--error, #d24b4e);
+  color: var(--error, #d24b4e);
+  border-radius: 6px;
+  padding: 10px 14px;
+  font-size: 13px;
+}
+.dialog-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.dialog-field-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.dialog-required {
+  color: var(--error, #d24b4e);
+  margin-left: 3px;
+}
+.dialog-input,
+.dialog-textarea,
+.dialog-select {
+  background: var(--bg-tertiary, var(--bg-primary));
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 14px;
+  padding: 8px 10px;
+  outline: none;
+  transition: border-color 0.15s;
+  width: 100%;
+  box-sizing: border-box;
+}
+.dialog-input:focus,
+.dialog-textarea:focus,
+.dialog-select:focus {
+  border-color: var(--accent, #1d6aba);
+}
+.dialog-textarea {
+  resize: vertical;
+  min-height: 80px;
+  font-family: inherit;
+}
+.dialog-select {
+  cursor: pointer;
+}
+.dialog-field.has-error .dialog-input,
+.dialog-field.has-error .dialog-textarea,
+.dialog-field.has-error .dialog-select {
+  border-color: var(--error, #d24b4e);
+}
+.dialog-field-error {
+  font-size: 12px;
+  color: var(--error, #d24b4e);
+}
+.dialog-help-text {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.dialog-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--text-primary);
+}
+.dialog-checkbox-label input[type="checkbox"],
+.dialog-radio-label input[type="radio"] {
+  margin: 0;
+  padding: 0;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  cursor: pointer;
+  appearance: auto;
+  vertical-align: middle;
+}
+.dialog-radio-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.dialog-radio-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--text-primary);
+}
+.dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 16px 20px;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
 /* Toggle switch */
 .settings-toggle {
   position: relative;

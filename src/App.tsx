@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef, useCallback, Component, type ReactNode, lazy, Suspense } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import type { InteractiveDialog } from "@/components/message/InteractiveDialogModal";
 import { useUiStore, type SidebarCategory } from "@/stores/uiStore";
 import { useMessagesStore } from "@/stores/messagesStore";
 import { primeLastViewedSnapshot } from "@/stores/lastViewedSnapshot";
@@ -27,6 +28,7 @@ const ProfileModal = lazy(() => import("@/components/user/ProfileModal").then(m 
 const SettingsModal = lazy(() => import("@/components/user/SettingsModal").then(m => ({ default: m.SettingsModal })));
 const ShortcutsModal = lazy(() => import("@/components/user/ShortcutsModal").then(m => ({ default: m.ShortcutsModal })));
 const CreateChannelModal = lazy(() => import("@/components/channel/CreateChannelModal").then(m => ({ default: m.CreateChannelModal })));
+const InteractiveDialogModal = lazy(() => import("@/components/message/InteractiveDialogModal").then(m => ({ default: m.InteractiveDialogModal })));
 
 // Error boundary to catch and display React errors instead of blank screen
 class ErrorBoundary extends Component<
@@ -107,6 +109,12 @@ function AppContent() {
   const [showShortcutsModal, setShowShortcutsModal] = useState(false);
   const [showCreateChannel, setShowCreateChannel] = useState(false);
   const [showChannelInfo, setShowChannelInfo] = useState(false);
+  const [interactiveDialog, setInteractiveDialog] = useState<{
+    serverId: string;
+    triggerId: string;
+    url: string;
+    dialog: InteractiveDialog;
+  } | null>(null);
 
   // Resizable panel widths
   const [sidebarWidth, setSidebarWidth] = useState(240);
@@ -149,6 +157,21 @@ function AppContent() {
   useEffect(() => {
     const unlisten = listen("menu:shortcuts", () => {
       setShowShortcutsModal(true);
+    });
+    return () => { unlisten.then((fn) => fn()); };
+  }, []);
+
+  // Listen for interactive dialog open events
+  useEffect(() => {
+    const unlisten = listen<{
+      serverId: string;
+      triggerId: string;
+      url: string;
+      dialog: InteractiveDialog;
+    }>("interactive_dialog_open", (event) => {
+      // Only show dialog if it has a valid elements array
+      if (!Array.isArray(event.payload.dialog?.elements)) return;
+      setInteractiveDialog(event.payload);
     });
     return () => { unlisten.then((fn) => fn()); };
   }, []);
@@ -691,6 +714,15 @@ function AppContent() {
                 });
               }
             }}
+          />
+        )}
+        {interactiveDialog && (
+          <InteractiveDialogModal
+            serverId={interactiveDialog.serverId}
+            triggerId={interactiveDialog.triggerId}
+            url={interactiveDialog.url}
+            dialog={interactiveDialog.dialog}
+            onClose={() => setInteractiveDialog(null)}
           />
         )}
       </Suspense>
