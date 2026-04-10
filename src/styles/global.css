@@ -2216,6 +2216,224 @@ button.secondary:hover:not(:disabled) {
   text-align: center;
 }
 
+/* Interactive Message Attachments */
+.message-attachments {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.message-attachment {
+  border-left: 4px solid var(--accent, #5865f2);
+  background: var(--bg-secondary, rgba(255,255,255,0.04));
+  border-radius: 0 4px 4px 0;
+  padding: 8px 12px;
+  max-width: 600px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.attachment-pretext {
+  margin-bottom: 6px;
+  color: var(--text-primary);
+}
+
+.attachment-author {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+.attachment-author-icon {
+  width: 14px;
+  height: 14px;
+  border-radius: 2px;
+}
+
+.attachment-author-name {
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.attachment-author-name:hover {
+  text-decoration: underline;
+}
+
+.attachment-title {
+  font-weight: 700;
+  margin-bottom: 4px;
+  color: var(--text-primary);
+}
+
+.attachment-title a {
+  color: var(--link, #5865f2);
+  text-decoration: none;
+}
+
+.attachment-title a:hover {
+  text-decoration: underline;
+}
+
+.attachment-text {
+  color: var(--text-primary);
+  margin-bottom: 6px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.attachment-image {
+  display: block;
+  max-width: 100%;
+  max-height: 300px;
+  border-radius: 4px;
+  margin-top: 6px;
+  object-fit: contain;
+}
+
+.attachment-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.attachment-fields-short {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.attachment-field {
+  flex: 1 1 100%;
+}
+
+.attachment-field.short {
+  flex: 1 1 calc(50% - 4px);
+  min-width: 120px;
+}
+
+.attachment-field-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 2px;
+}
+
+.attachment-field-value {
+  font-size: 13px;
+  color: var(--text-primary);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.attachment-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.attachment-action-btn {
+  padding: 4px 14px;
+  border-radius: 4px;
+  border: 1px solid var(--border, rgba(255,255,255,0.12));
+  background: var(--bg-elevated, rgba(255,255,255,0.08));
+  color: var(--text-primary);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s, opacity 0.15s;
+  font-family: inherit;
+}
+
+.attachment-action-btn:hover:not(:disabled) {
+  background: var(--bg-hover, rgba(255,255,255,0.12));
+}
+
+.attachment-action-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.attachment-action-btn--primary {
+  background: var(--accent, #5865f2);
+  color: #fff;
+  border-color: transparent;
+}
+
+.attachment-action-btn--primary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent, #5865f2) 85%, black);
+}
+
+.attachment-action-btn--success,
+.attachment-action-btn--good {
+  background: var(--success, #27ae60);
+  color: #fff;
+  border-color: transparent;
+}
+
+.attachment-action-btn--warning {
+  background: var(--warning, #e67e22);
+  color: #fff;
+  border-color: transparent;
+}
+
+.attachment-action-btn--danger {
+  background: var(--danger, #e74c3c);
+  color: #fff;
+  border-color: transparent;
+}
+
+.attachment-action-select-wrap {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.attachment-action-select {
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--border, rgba(255,255,255,0.12));
+  background: var(--bg-secondary, rgba(255,255,255,0.04));
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.attachment-action-select:focus {
+  outline: 1px solid var(--accent, #5865f2);
+}
+
+.attachment-footer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.attachment-footer-icon {
+  width: 16px;
+  height: 16px;
+  border-radius: 2px;
+}
+
+.attachment-footer-text {
+  font-size: 11px;
+  color: var(--text-muted, rgba(255,255,255,0.4));
+}
+
+.attachment-thumb {
+  width: 64px;
+  height: 64px;
+  object-fit: cover;
+  border-radius: 4px;
+  margin-left: auto;
+}
+
 /* File Attachments */
 .file-attachments {
   display: flex;

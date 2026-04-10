@@ -11,6 +11,7 @@ import { FileAttachment } from "./FileAttachment";
 import { UserPopover } from "@/components/user/UserPopover";
 import { ReactionsBar } from "./ReactionsBar";
 import { EmojiPicker } from "./EmojiPicker";
+import { MessageAttachments, type MessageAttachment } from "./MessageAttachments";
 
 interface MessageItemProps {
   post: PostData;
@@ -213,6 +214,27 @@ export const MessageItem = memo(function MessageItem({
           <CustomEmojiRenderer text={post.message} />
           {isEdited && <span className="message-edited">(edited)</span>}
         </div>
+
+        {/* Interactive message attachments (Mattermost slash commands, bots, integrations).
+            The server signals attachment content via metadata.embeds[].type === 'message_attachment'
+            and stores the actual data in props.attachments (same as official webapp/mobile). */}
+        {serverId && (() => {
+          const hasEmbedType = post.metadata?.embeds?.some((e) => e.type === "message_attachment");
+          const attachments = Array.isArray((post.props as Record<string, unknown>)?.attachments)
+            ? (post.props as Record<string, unknown>).attachments as MessageAttachment[]
+            : null;
+          if ((hasEmbedType || attachments) && attachments && attachments.length > 0) {
+            return (
+              <MessageAttachments
+                attachments={attachments}
+                postId={post.id}
+                serverId={serverId}
+                onPostUpdated={refreshReactions}
+              />
+            );
+          }
+          return null;
+        })()}
 
         {/* File attachments */}
         {post.file_ids && post.file_ids.length > 0 && serverId && (

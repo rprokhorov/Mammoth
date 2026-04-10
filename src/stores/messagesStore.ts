@@ -24,6 +24,7 @@ export interface PostData {
   props: Record<string, unknown>;
   metadata?: {
     reactions?: ReactionData[];
+    embeds?: Array<{ type: string; url?: string }>;
   };
 }
 

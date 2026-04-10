@@ -186,6 +186,8 @@ Implemented in one pass:
 | 67 | В списке Threads View кнопка с именем канала после имени автора (для DM — ФИО/nickname собеседника, для каналов — # name); ширина 200px в ThreadsView, 120px в ThreadPanel | Готово | 1 |
 | 68 | После отправки сообщения (или отмены редактирования) высота поля ввода сбрасывается до стандартной — в основном composer и в панели тредов | Готово | 1 |
 | 69 | На корневых сообщениях с тредами отображаются аватарки участников (макс. 3); кликабельны — открывают карточку пользователя; загружаются фоном при открытии канала и при скролле вверх | Готово | 4 |
+| 70 | При перетаскивании уже открытого канала в TabBar — активируется существующий таб вместо создания дубликата | Готово | 1 |
+| 71 | Рендеринг Mattermost interactive messages (attachments) в чате и тредах: цветная полоса, автор, заголовок, текст, поля, изображения, футер, кнопки (button/select со стилями) — клик по кнопке вызывает POST /posts/{id}/actions/{actionId} | Готово | 2 (первая попытка не учитывала encodeURIComponent(actionId), metadata.embeds для определения типа, disabled у actions) |
 
 ---
 
@@ -203,7 +205,7 @@ Implemented in one pass:
 | GIF picker | Deferred |
 | WebRTC Calls (Phase 11) | Not started |
 | E2E test suite | Not started |
-| Slash commands, interactive buttons | Not started |
+| Slash commands | Not started |
 
 ---
 

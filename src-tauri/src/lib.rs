@@ -141,6 +141,7 @@ pub fn run() {
             commands::send_post,
             commands::edit_post,
             commands::delete_post,
+            commands::do_post_action,
             // Threads
             commands::get_post_thread,
             commands::get_user_threads,

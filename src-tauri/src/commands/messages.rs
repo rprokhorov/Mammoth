@@ -119,6 +119,33 @@ pub async fn edit_post(
 }
 
 #[tauri::command]
+pub async fn do_post_action(
+    state: State<'_, AppState>,
+    server_id: String,
+    post_id: String,
+    action_id: String,
+    selected_option: String,
+    cookie: String,
+) -> Result<serde_json::Value, AppError> {
+    let client = {
+        let servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let server = servers
+            .get(&server_id)
+            .ok_or_else(|| AppError::NotFound(format!("Server {} not found", server_id)))?;
+        server.client.clone()
+    };
+
+    client
+        .do_post_action(
+            &post_id,
+            &action_id,
+            if selected_option.is_empty() { None } else { Some(selected_option.as_str()) },
+            if cookie.is_empty() { None } else { Some(cookie.as_str()) },
+        )
+        .await
+}
+
+#[tauri::command]
 pub async fn delete_post(
     state: State<'_, AppState>,
     server_id: String,

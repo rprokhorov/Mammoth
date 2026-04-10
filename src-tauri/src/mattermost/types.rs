@@ -121,6 +121,16 @@ pub struct Post {
 pub struct PostMetadata {
     #[serde(default)]
     pub reactions: Option<Vec<Reaction>>,
+    #[serde(default)]
+    pub embeds: Option<Vec<PostEmbed>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PostEmbed {
+    #[serde(alias = "type", default)]
+    pub embed_type: String,
+    #[serde(default)]
+    pub url: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

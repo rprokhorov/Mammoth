@@ -1483,6 +1483,49 @@ impl MattermostClient {
         Ok(bytes.to_vec())
     }
 
+    /// Trigger an interactive message action (button click)
+    pub async fn do_post_action(
+        &self,
+        post_id: &str,
+        action_id: &str,
+        selected_option: Option<&str>,
+        cookie: Option<&str>,
+    ) -> Result<serde_json::Value, AppError> {
+        let auth = self.auth_header()?;
+        let mut body = serde_json::json!({
+            "selected_option": selected_option.unwrap_or("")
+        });
+        if let Some(c) = cookie {
+            body["cookie"] = serde_json::Value::String(c.to_string());
+        }
+        // action_id must be percent-encoded (matches official client behaviour)
+        let encoded_action_id: String = action_id
+            .chars()
+            .flat_map(|c| {
+                if c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == '.' || c == '~' {
+                    vec![c]
+                } else {
+                    format!("%{:02X}", c as u32).chars().collect::<Vec<_>>()
+                }
+            })
+            .collect();
+        let resp = self
+            .http
+            .post(self.api_url(&format!("/posts/{}/actions/{}", post_id, encoded_action_id)))
+            .header(header::AUTHORIZATION, &auth)
+            .json(&body)
+            .send()
+            .await?;
+
+        if !resp.status().is_success() {
+            let status = resp.status().as_u16();
+            let msg = resp.text().await.unwrap_or_default();
+            return Err(AppError::Api { status, message: msg });
+        }
+        let result: serde_json::Value = resp.json().await.unwrap_or(serde_json::Value::Null);
+        Ok(result)
+    }
+
     /// Create or get existing DM channel between two users
     pub async fn create_direct_channel(
         &self,
