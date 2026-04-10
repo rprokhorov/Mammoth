@@ -2229,6 +2229,7 @@ dependencies = [
  "chrono",
  "futures-util",
  "log",
+ "mac-notification-sys",
  "png",
  "reqwest 0.12.28",
  "serde",

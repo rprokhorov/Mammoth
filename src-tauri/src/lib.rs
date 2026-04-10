@@ -11,6 +11,55 @@ use tauri::{
 };
 use state::AppState;
 
+/// Initialize mac_notification_sys once
+#[cfg(target_os = "macos")]
+static NOTIF_INIT: std::sync::Once = std::sync::Once::new();
+
+#[tauri::command]
+fn show_notification(app: tauri::AppHandle, title: String, body: String, channel_id: String) {
+    std::thread::spawn(move || {
+        #[cfg(target_os = "macos")]
+        {
+            use mac_notification_sys::{Notification, NotificationResponse};
+
+            // Set application once — use com.apple.Terminal to avoid "Choose Application" dialog
+            NOTIF_INIT.call_once(|| {
+                let _ = mac_notification_sys::set_application("com.apple.Terminal");
+            });
+
+            // send() with wait_for_click blocks until user interacts with the notification
+            let response = Notification::default()
+                .title(&title)
+                .message(&body)
+                .wait_for_click(true)
+                .send();
+
+            if let Ok(NotificationResponse::Click) = response {
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.show();
+                    let _ = window.unminimize();
+                    let _ = window.set_focus();
+                    let _ = window.emit("notif:navigate-channel", &channel_id);
+                }
+            }
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
+            let _ = (app, title, body, channel_id);
+        }
+    });
+}
+
+#[tauri::command]
+fn show_main_window(app: tauri::AppHandle) {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.show();
+        let _ = window.unminimize();
+        let _ = window.set_focus();
+    }
+}
+
+
 #[tauri::command]
 fn set_badge_count(app: tauri::AppHandle, count: u32) -> Result<(), String> {
     if let Some(tray) = app.tray_by_id("main-tray") {
@@ -142,6 +191,9 @@ pub fn run() {
             commands::edit_post,
             commands::delete_post,
             commands::do_post_action,
+            commands::submit_dialog,
+            commands::poll_dialog,
+            commands::fetch_dialog_by_trigger,
             commands::autocomplete_slash_commands,
             commands::execute_slash_command,
             // Threads
@@ -209,6 +261,8 @@ pub fn run() {
             commands::open_url,
             // Tray / Badge
             set_badge_count,
+            show_main_window,
+            show_notification,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

@@ -161,6 +161,16 @@ function AppContent() {
     return () => { unlisten.then((fn) => fn()); };
   }, []);
 
+  // Navigate to channel when notification is clicked (emitted from Rust)
+  useEffect(() => {
+    const unlisten = listen<string>("notif:navigate-channel", (event) => {
+      console.log("[notif] navigate-channel:", event.payload);
+      handleSelectChannel(event.payload);
+    });
+    return () => { unlisten.then((fn) => fn()); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Listen for interactive dialog open events
   useEffect(() => {
     const unlisten = listen<{

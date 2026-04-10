@@ -4,7 +4,6 @@ import { listen, emit } from "@tauri-apps/api/event";
 import {
   isPermissionGranted,
   requestPermission,
-  sendNotification,
 } from "@tauri-apps/plugin-notification";
 import { useUiStore } from "@/stores/uiStore";
 import { useMessagesStore, type PostData } from "@/stores/messagesStore";
@@ -171,10 +170,13 @@ function handlePosted(
         ? post.message.slice(0, 100) + "..."
         : post.message;
 
-      sendNotification({
+      // Show notification via Rust — uses mac_notification_sys with wait_for_click
+      // which blocks the thread until user clicks, then emits notif:navigate-channel
+      invoke("show_notification", {
         title: `${senderName} in ${channelName}`,
         body: preview,
-      });
+        channelId,
+      }).catch(() => {});
     }
 
     // Update dock/taskbar badge count
