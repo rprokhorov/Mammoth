@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { useTauriDragDrop } from "@/hooks/useTauriDragDrop";
 import { useMessagesStore, type PostData } from "@/stores/messagesStore";
+import { useUiStore } from "@/stores/uiStore";
 import { EMOJI_MAP, EmojiPicker } from "./EmojiPicker";
 
 interface MessageComposerProps {
@@ -23,6 +24,14 @@ interface FileUploadResult {
   file_infos: Array<{ id: string; name: string; extension: string; mime_type: string }>;
 }
 
+interface SlashCommandSuggestion {
+  Complete: string;
+  Suggestion: string;
+  Description: string;
+  Hint: string;
+  IconData: string;
+}
+
 const IMAGE_EXTS = ["png", "jpg", "jpeg", "gif", "bmp", "webp"];
 const ALL_EMOJI_NAMES = Object.keys(EMOJI_MAP);
 
@@ -36,9 +45,13 @@ export function MessageComposer({ channelId, serverId }: MessageComposerProps) {
   const [emojiSelectedIdx, setEmojiSelectedIdx] = useState(0);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [emojiPickerStyle, setEmojiPickerStyle] = useState<React.CSSProperties>({});
+  const [slashResults, setSlashResults] = useState<SlashCommandSuggestion[]>([]);
+  const [slashSelectedIdx, setSlashSelectedIdx] = useState(0);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const emojiTriggerRef = useRef<HTMLButtonElement>(null);
   const composerRef = useRef<HTMLDivElement>(null);
+
+  const activeTeamId = useUiStore((s) => s.activeTeamId);
 
   const editingPostId = useMessagesStore((s) => s.editingPostId);
   const posts = useMessagesStore((s) => s.posts);
@@ -95,6 +108,39 @@ export function MessageComposer({ channelId, serverId }: MessageComposerProps) {
       setEmojiResults([]);
     }
   }, [text]);
+
+  // Slash command autocomplete
+  useEffect(() => {
+    const ta = textareaRef.current;
+    if (!ta) return;
+    const cursor = ta.selectionStart;
+    const before = text.slice(0, cursor);
+    // Trigger when message starts with "/"
+    if (before.match(/^\//)) {
+      invoke<SlashCommandSuggestion[]>("autocomplete_slash_commands", {
+        serverId,
+        teamId: activeTeamId ?? "",
+        channelId,
+        command: before,
+      })
+        .then((results) => {
+          setSlashResults(results);
+          setSlashSelectedIdx(0);
+        })
+        .catch(() => setSlashResults([]));
+    } else {
+      setSlashResults([]);
+    }
+  }, [text, activeTeamId, serverId, channelId]);
+
+  function selectSlashCommand(cmd: SlashCommandSuggestion) {
+    const prefix = cmd.Complete.startsWith("/") ? cmd.Complete : "/" + cmd.Complete;
+    setText(prefix + " ");
+    setSlashResults([]);
+    requestAnimationFrame(() => {
+      textareaRef.current?.focus();
+    });
+  }
 
   function insertEmoji(emojiName: string) {
     const ta = textareaRef.current;
@@ -256,6 +302,12 @@ export function MessageComposer({ channelId, serverId }: MessageComposerProps) {
         });
         updatePost(updated);
         setEditingPostId(null);
+      } else if (trimmed.startsWith("/") && readyFileIds.length === 0) {
+        await invoke("execute_slash_command", {
+          serverId,
+          channelId,
+          command: trimmed,
+        });
       } else {
         const newPost = await invoke<PostData>("send_post", {
           serverId,
@@ -276,6 +328,14 @@ export function MessageComposer({ channelId, serverId }: MessageComposerProps) {
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
+    if (slashResults.length > 0) {
+      if (e.key === "ArrowDown") { e.preventDefault(); setSlashSelectedIdx((i) => Math.min(i + 1, slashResults.length - 1)); return; }
+      if (e.key === "ArrowUp") { e.preventDefault(); setSlashSelectedIdx((i) => Math.max(i - 1, 0)); return; }
+      if (e.key === "Tab" || e.key === "Enter") {
+        if (slashResults[slashSelectedIdx]) { e.preventDefault(); selectSlashCommand(slashResults[slashSelectedIdx]); return; }
+      }
+      if (e.key === "Escape") { e.preventDefault(); setSlashResults([]); return; }
+    }
     if (emojiResults.length > 0) {
       if (e.key === "ArrowDown") { e.preventDefault(); setEmojiSelectedIdx((i) => Math.min(i + 1, emojiResults.length - 1)); return; }
       if (e.key === "ArrowUp") { e.preventDefault(); setEmojiSelectedIdx((i) => Math.max(i - 1, 0)); return; }
@@ -311,6 +371,23 @@ export function MessageComposer({ channelId, serverId }: MessageComposerProps) {
 
       {isDragging && (
         <div className="composer-drop-hint">Drop files to attach</div>
+      )}
+
+      {/* Slash command autocomplete */}
+      {slashResults.length > 0 && (
+        <div className="slash-autocomplete">
+          {slashResults.map((cmd, i) => (
+            <button
+              key={cmd.Complete}
+              className={`slash-autocomplete-item ${i === slashSelectedIdx ? "selected" : ""}`}
+              onMouseDown={(e) => { e.preventDefault(); selectSlashCommand(cmd); }}
+            >
+              <span className="slash-autocomplete-trigger">{cmd.Complete}</span>
+              <span className="slash-autocomplete-hint">{cmd.Hint}</span>
+              <span className="slash-autocomplete-desc">{cmd.Description}</span>
+            </button>
+          ))}
+        </div>
       )}
 
       {/* Emoji autocomplete */}

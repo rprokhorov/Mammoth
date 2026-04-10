@@ -244,6 +244,23 @@ pub struct UserStatus {
     pub last_activity_at: i64,
 }
 
+// --- Slash Commands ---
+
+/// Returned by /api/v4/commands/autocomplete_suggestions
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SlashCommand {
+    #[serde(rename = "Complete", default)]
+    pub complete: String,
+    #[serde(rename = "Suggestion", default)]
+    pub suggestion: String,
+    #[serde(rename = "Description", default)]
+    pub description: String,
+    #[serde(rename = "Hint", default)]
+    pub hint: String,
+    #[serde(rename = "IconData", default)]
+    pub icon_data: String,
+}
+
 // --- Sidebar Categories ---
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

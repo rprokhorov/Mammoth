@@ -2,7 +2,7 @@ use serde::Serialize;
 use tauri::State;
 
 use crate::errors::AppError;
-use crate::mattermost::types::{Post, PostList};
+use crate::mattermost::types::{Post, PostList, SlashCommand};
 use crate::state::AppState;
 
 #[derive(Debug, Clone, Serialize)]
@@ -160,4 +160,41 @@ pub async fn delete_post(
     };
 
     client.delete_post(&post_id).await
+}
+
+#[tauri::command]
+pub async fn autocomplete_slash_commands(
+    state: State<'_, AppState>,
+    server_id: String,
+    team_id: String,
+    channel_id: String,
+    command: String,
+) -> Result<Vec<SlashCommand>, AppError> {
+    let client = {
+        let servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let server = servers
+            .get(&server_id)
+            .ok_or_else(|| AppError::NotFound(format!("Server {} not found", server_id)))?;
+        server.client.clone()
+    };
+
+    client.autocomplete_commands(&team_id, &channel_id, &command).await
+}
+
+#[tauri::command]
+pub async fn execute_slash_command(
+    state: State<'_, AppState>,
+    server_id: String,
+    channel_id: String,
+    command: String,
+) -> Result<serde_json::Value, AppError> {
+    let client = {
+        let servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let server = servers
+            .get(&server_id)
+            .ok_or_else(|| AppError::NotFound(format!("Server {} not found", server_id)))?;
+        server.client.clone()
+    };
+
+    client.execute_command(&channel_id, &command).await
 }

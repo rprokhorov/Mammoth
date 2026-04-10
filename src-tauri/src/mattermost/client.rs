@@ -492,6 +492,67 @@ impl MattermostClient {
         Ok(())
     }
 
+    // --- Slash Commands ---
+
+    pub async fn autocomplete_commands(
+        &self,
+        team_id: &str,
+        channel_id: &str,
+        command: &str,
+    ) -> Result<Vec<super::types::SlashCommand>, AppError> {
+        let auth = self.auth_header()?;
+        let encoded_command: String = url::form_urlencoded::byte_serialize(command.as_bytes()).collect();
+        let url = self.api_url(&format!(
+            "/teams/{}/commands/autocomplete_suggestions?channel_id={}&user_input={}",
+            team_id,
+            channel_id,
+            encoded_command,
+        ));
+        let resp = self
+            .http
+            .get(url)
+            .header(header::AUTHORIZATION, &auth)
+            .send()
+            .await?;
+
+        if !resp.status().is_success() {
+            let status = resp.status().as_u16();
+            let msg = resp.text().await.unwrap_or_default();
+            return Err(AppError::Api { status, message: msg });
+        }
+
+        let commands: Vec<super::types::SlashCommand> = resp.json().await?;
+        Ok(commands)
+    }
+
+    pub async fn execute_command(
+        &self,
+        channel_id: &str,
+        command: &str,
+    ) -> Result<serde_json::Value, AppError> {
+        let auth = self.auth_header()?;
+        let body = serde_json::json!({
+            "channel_id": channel_id,
+            "command": command,
+        });
+        let resp = self
+            .http
+            .post(self.api_url("/commands/execute"))
+            .header(header::AUTHORIZATION, &auth)
+            .json(&body)
+            .send()
+            .await?;
+
+        if !resp.status().is_success() {
+            let status = resp.status().as_u16();
+            let msg = resp.text().await.unwrap_or_default();
+            return Err(AppError::Api { status, message: msg });
+        }
+
+        let result: serde_json::Value = resp.json().await?;
+        Ok(result)
+    }
+
     // --- Files ---
 
     pub async fn upload_file(
