@@ -188,6 +188,7 @@ Implemented in one pass:
 | 69 | На корневых сообщениях с тредами отображаются аватарки участников (макс. 3); кликабельны — открывают карточку пользователя; загружаются фоном при открытии канала и при скролле вверх | Готово | 4 |
 | 70 | При перетаскивании уже открытого канала в TabBar — активируется существующий таб вместо создания дубликата | Готово | 1 |
 | 71 | Рендеринг Mattermost interactive messages (attachments) в чате и тредах: цветная полоса, автор, заголовок, текст, поля, изображения, футер, кнопки (button/select со стилями) — клик по кнопке вызывает POST /posts/{id}/actions/{actionId} | Готово | 2 (первая попытка не учитывала encodeURIComponent(actionId), metadata.embeds для определения типа, disabled у actions) |
+| 72 | Поддержка slash-команд: автокомплит при вводе `/` в поле ввода (dropdown с trigger/hint/description), навигация стрелками, Tab/Enter для выбора, Escape для закрытия; отправка команды через POST /api/v4/commands/execute вместо /posts | Готово | 4 (неверный URL /commands/autocomplete_suggestions → /teams/{id}/commands/autocomplete_suggestions; структура ответа AutocompleteSuggestion с PascalCase полями вместо ожидаемой Command; поля десериализовались в snake_case но приходили как PascalCase из Tauri; regex не матчил `/cmd args` с пробелом) |
 
 ---
 
@@ -205,7 +206,7 @@ Implemented in one pass:
 | GIF picker | Deferred |
 | WebRTC Calls (Phase 11) | Not started |
 | E2E test suite | Not started |
-| Slash commands | Not started |
+| Slash commands | Реализовано (автокомплит + выполнение) |
 
 ---
 
