@@ -41,7 +41,13 @@ export function TabBar({ onSelectChannel, currentUserId }: TabBarProps) {
       const rect = el.getBoundingClientRect();
       const inside = x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
       if (inside) {
-        useTabsStore.getState().openNewTab(channelId);
+        const { tabs } = useTabsStore.getState();
+        const alreadyOpen = tabs.find((t) => t.channelId === channelId);
+        if (!alreadyOpen) {
+          useTabsStore.getState().openNewTab(channelId);
+        } else {
+          useTabsStore.getState().setActiveTab(alreadyOpen.id);
+        }
         onSelectChannel(channelId);
       }
     });
