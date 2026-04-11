@@ -88,6 +88,9 @@ export function useWebSocket() {
         case "reaction_added":
           handleReactionAdded(data, broadcast);
           break;
+        case "reaction_removed":
+          handleReactionRemoved(data);
+          break;
         case "open_dialog":
           handleOpenDialog(data, server_id);
           break;
@@ -301,6 +304,51 @@ function handleEphemeralMessage(
   }
 }
 
+function addReactionToPost(reaction: { user_id: string; post_id: string; emoji_name: string; create_at: number }) {
+  const messagesStore = useMessagesStore.getState();
+  const post = messagesStore.posts[reaction.post_id];
+  if (!post) return;
+
+  const existing = post.metadata?.reactions || [];
+  // Avoid duplicates
+  const alreadyExists = existing.some(
+    (r) => r.user_id === reaction.user_id && r.emoji_name === reaction.emoji_name,
+  );
+  if (alreadyExists) return;
+
+  const updatedPost = {
+    ...post,
+    metadata: {
+      ...post.metadata,
+      reactions: [...existing, reaction],
+    },
+  };
+  messagesStore.updatePost(updatedPost);
+  useThreadsStore.getState().updateThreadPost(updatedPost);
+}
+
+function removeReactionFromPost(reaction: { user_id: string; post_id: string; emoji_name: string }) {
+  const messagesStore = useMessagesStore.getState();
+  const post = messagesStore.posts[reaction.post_id];
+  if (!post) return;
+
+  const existing = post.metadata?.reactions || [];
+  const filtered = existing.filter(
+    (r) => !(r.user_id === reaction.user_id && r.emoji_name === reaction.emoji_name),
+  );
+  if (filtered.length === existing.length) return; // nothing changed
+
+  const updatedPost = {
+    ...post,
+    metadata: {
+      ...post.metadata,
+      reactions: filtered,
+    },
+  };
+  messagesStore.updatePost(updatedPost);
+  useThreadsStore.getState().updateThreadPost(updatedPost);
+}
+
 function handleReactionAdded(
   data: Record<string, unknown>,
   broadcast: { channel_id: string; user_id: string },
@@ -315,15 +363,15 @@ function handleReactionAdded(
       create_at: number;
     };
 
-    // Only notify if someone else reacted to MY post or MY thread reply
+    // Update the post's reactions in the store so the chip appears under the post
+    addReactionToPost(reaction);
+
+    // Only notify if someone else reacted to MY post
     const currentUserId = useUiStore.getState().currentUserId;
     if (!currentUserId) return;
-    // Don't notify about own reactions
     if (reaction.user_id === currentUserId) return;
 
-    // Check if the post belongs to the current user
-    const posts = useMessagesStore.getState().posts;
-    const post = posts[reaction.post_id];
+    const post = useMessagesStore.getState().posts[reaction.post_id];
     if (!post) return;
     if (post.user_id !== currentUserId) return;
 
@@ -340,6 +388,24 @@ function handleReactionAdded(
       createAt: reaction.create_at,
       read: false,
     });
+  } catch {
+    // ignore parse errors
+  }
+}
+
+function handleReactionRemoved(
+  data: Record<string, unknown>,
+) {
+  try {
+    const reactionStr = data.reaction as string | undefined;
+    if (!reactionStr) return;
+    const reaction = JSON.parse(reactionStr) as {
+      user_id: string;
+      post_id: string;
+      emoji_name: string;
+    };
+
+    removeReactionFromPost(reaction);
   } catch {
     // ignore parse errors
   }
