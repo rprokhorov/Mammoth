@@ -5,6 +5,7 @@ import { useTauriDragDrop } from "@/hooks/useTauriDragDrop";
 import { useMessagesStore, type PostData } from "@/stores/messagesStore";
 import { useUiStore } from "@/stores/uiStore";
 import { EMOJI_MAP, EmojiPicker } from "./EmojiPicker";
+import { MarkdownToolbar, handleMarkdownShortcut } from "./MarkdownToolbar";
 
 interface MessageComposerProps {
   channelId: string;
@@ -374,6 +375,7 @@ export function MessageComposer({ channelId, serverId }: MessageComposerProps) {
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
+    if (handleMarkdownShortcut(e, textareaRef, text, setText)) return;
     if (slashResults.length > 0) {
       if (e.key === "ArrowDown") { e.preventDefault(); setSlashSelectedIdx((i) => Math.min(i + 1, slashResults.length - 1)); return; }
       if (e.key === "ArrowUp") { e.preventDefault(); setSlashSelectedIdx((i) => Math.max(i - 1, 0)); return; }
@@ -479,6 +481,13 @@ export function MessageComposer({ channelId, serverId }: MessageComposerProps) {
           })}
         </div>
       )}
+
+      <MarkdownToolbar
+        textareaRef={textareaRef}
+        text={text}
+        setText={setText}
+        disabled={sending}
+      />
 
       <div className="composer-input-row">
         <button

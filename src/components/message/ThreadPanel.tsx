@@ -9,6 +9,7 @@ import { useTabsStore } from "@/stores/tabsStore";
 import { primeLastViewedSnapshot } from "@/stores/lastViewedSnapshot";
 import { MessageItem } from "./MessageItem";
 import { EmojiPicker, EMOJI_MAP } from "./EmojiPicker";
+import { MarkdownToolbar, handleMarkdownShortcut } from "./MarkdownToolbar";
 
 interface AttachedFile {
   path: string;
@@ -335,6 +336,7 @@ export function ThreadPanel({ serverId, currentUserId, width }: ThreadPanelProps
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
+    if (handleMarkdownShortcut(e, textareaRef, text, handleTextChange)) return;
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSend();
@@ -544,6 +546,12 @@ export function ThreadPanel({ serverId, currentUserId, width }: ThreadPanelProps
             })}
           </div>
         )}
+        <MarkdownToolbar
+          textareaRef={textareaRef}
+          text={text}
+          setText={handleTextChange}
+          disabled={sending}
+        />
         <div className="composer-input-row">
           <button
             className="composer-attach-btn"
