@@ -1,5 +1,5 @@
 use serde::Serialize;
-use tauri::State;
+use tauri::{Manager, State};
 
 use crate::errors::AppError;
 use crate::mattermost::types::FileInfo;
@@ -122,17 +122,58 @@ pub async fn get_image_thumbnail(
     Ok(ImageDataResult { data_url })
 }
 
-#[derive(Debug, Clone, serde::Serialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct CustomEmoji {
     pub id: String,
     pub name: String,
 }
 
-/// Returns all custom emojis for the server (fetches all pages).
+/// Save custom emoji list to disk cache.
+#[tauri::command]
+pub async fn save_emoji_cache(
+    app_handle: tauri::AppHandle,
+    server_id: String,
+    emojis: Vec<CustomEmoji>,
+) -> Result<(), AppError> {
+    let cache_dir = app_handle
+        .path()
+        .app_cache_dir()
+        .map_err(|_| AppError::Config("Cannot resolve app cache dir".into()))?;
+    std::fs::create_dir_all(&cache_dir)?;
+    let path = cache_dir.join(format!("emojis_{}.json", server_id));
+    let data = serde_json::to_string(&emojis)
+        .map_err(|e| AppError::Config(format!("Failed to serialize emoji cache: {}", e)))?;
+    std::fs::write(&path, data)?;
+    Ok(())
+}
+
+/// Load custom emoji list from disk cache.
+#[tauri::command]
+pub async fn load_emoji_cache(
+    app_handle: tauri::AppHandle,
+    server_id: String,
+) -> Result<Vec<CustomEmoji>, AppError> {
+    let cache_dir = app_handle
+        .path()
+        .app_cache_dir()
+        .map_err(|_| AppError::Config("Cannot resolve app cache dir".into()))?;
+    let path = cache_dir.join(format!("emojis_{}.json", server_id));
+    if !path.exists() {
+        return Ok(Vec::new());
+    }
+    let data = std::fs::read_to_string(&path)?;
+    let emojis: Vec<CustomEmoji> = serde_json::from_str(&data)
+        .map_err(|e| AppError::Config(format!("Failed to parse emoji cache: {}", e)))?;
+    Ok(emojis)
+}
+
+/// Returns a single page of custom emojis for the server.
 #[tauri::command]
 pub async fn get_custom_emojis(
     state: State<'_, AppState>,
     server_id: String,
+    page: u32,
+    per_page: u32,
 ) -> Result<Vec<CustomEmoji>, AppError> {
     let client = {
         let servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
@@ -142,26 +183,17 @@ pub async fn get_custom_emojis(
         server.client.clone()
     };
 
-    let per_page = 100u32;
-    let mut all = Vec::new();
-    let mut page = 0u32;
-    loop {
-        let batch = client.get_custom_emojis(page, per_page).await?;
-        let len = batch.len();
-        for item in batch {
-            if let (Some(id), Some(name)) = (
-                item["id"].as_str().map(str::to_string),
-                item["name"].as_str().map(str::to_string),
-            ) {
-                all.push(CustomEmoji { id, name });
-            }
+    let batch = client.get_custom_emojis(page, per_page).await?;
+    let mut result = Vec::with_capacity(batch.len());
+    for item in batch {
+        if let (Some(id), Some(name)) = (
+            item["id"].as_str().map(str::to_string),
+            item["name"].as_str().map(str::to_string),
+        ) {
+            result.push(CustomEmoji { id, name });
         }
-        if len == 0 { break; }
-        page += 1;
-        // Safety cap to avoid infinite loop
-        if page > 200 { break; }
     }
-    Ok(all)
+    Ok(result)
 }
 
 /// Downloads a custom emoji image and returns it as a base64 data URL.

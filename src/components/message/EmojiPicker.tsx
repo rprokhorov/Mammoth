@@ -1,5 +1,5 @@
-import { useState, useRef, useEffect, memo } from "react";
-import { useCustomEmojiStore } from "@/stores/customEmojiStore";
+import { useState, useRef, useEffect, useCallback, memo } from "react";
+import { useCustomEmojiStore, CustomEmoji } from "@/stores/customEmojiStore";
 import { useCustomEmojiImage } from "@/hooks/useCustomEmojiImage";
 
 interface EmojiPickerProps {
@@ -485,6 +485,69 @@ const CustomEmojiBtn = memo(function CustomEmojiBtn({
   );
 });
 
+// Virtualized grid for custom emojis — only renders visible rows
+const COLS = 8;
+const ROW_HEIGHT = 34; // px per row (22px emoji + 4px padding*2 + gap)
+const BUFFER_ROWS = 4;
+
+const VirtualCustomEmojiGrid = memo(function VirtualCustomEmojiGrid({
+  emojis, onSelect, loading, loadedCount,
+}: {
+  emojis: CustomEmoji[];
+  onSelect: (name: string) => void;
+  loading: boolean;
+  loadedCount: number;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [scrollTop, setScrollTop] = useState(0);
+
+  const totalRows = Math.ceil(emojis.length / COLS);
+  const totalHeight = totalRows * ROW_HEIGHT;
+
+  const handleScroll = useCallback(() => {
+    if (containerRef.current) {
+      setScrollTop(containerRef.current.scrollTop);
+    }
+  }, []);
+
+  const viewportHeight = 240;
+  const startRow = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - BUFFER_ROWS);
+  const endRow = Math.min(totalRows, Math.ceil((scrollTop + viewportHeight) / ROW_HEIGHT) + BUFFER_ROWS);
+
+  const visibleEmojis = emojis.slice(startRow * COLS, endRow * COLS);
+
+  return (
+    <div
+      ref={containerRef}
+      onScroll={handleScroll}
+      style={{ maxHeight: viewportHeight, overflowY: "auto" }}
+    >
+      <div style={{ height: totalHeight, position: "relative" }}>
+        <div
+          style={{
+            position: "absolute",
+            top: startRow * ROW_HEIGHT,
+            left: 0,
+            right: 0,
+            display: "grid",
+            gridTemplateColumns: `repeat(${COLS}, 1fr)`,
+            padding: "0 8px",
+          }}
+        >
+          {visibleEmojis.map((e) => (
+            <CustomEmojiBtn key={e.id} id={e.id} name={e.name} onSelect={onSelect} />
+          ))}
+        </div>
+      </div>
+      {loading && (
+        <div style={{ textAlign: "center", padding: "8px", color: "var(--text-secondary)", fontSize: "12px" }}>
+          Loading custom emojis... ({loadedCount})
+        </div>
+      )}
+    </div>
+  );
+});
+
 const CAT_ICONS: Record<string, string> = {
   "Smileys": "😀",
   "People": "👋",
@@ -500,6 +563,8 @@ export function EmojiPicker({ onSelect, onClose, triggerRef }: EmojiPickerProps)
   const [activeCategory, setActiveCategory] = useState("Smileys");
   const pickerRef = useRef<HTMLDivElement>(null);
   const customEmojis = useCustomEmojiStore((s) => s.emojis);
+  const emojiLoading = useCustomEmojiStore((s) => s.loading);
+  const emojiLoadedCount = useCustomEmojiStore((s) => s.loadedCount);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -554,28 +619,37 @@ export function EmojiPicker({ onSelect, onClose, triggerRef }: EmojiPickerProps)
               {CAT_ICONS[cat] ?? cat.charAt(0)}
             </button>
           ))}
-          {customEmojis.length > 0 && (
+          {(customEmojis.length > 0 || emojiLoading) && (
             <button
               className={`emoji-cat-btn ${activeCategory === "__custom__" ? "active" : ""}`}
               onClick={() => setActiveCategory("__custom__")}
-              title="Custom"
+              title={emojiLoading ? `Custom (loading... ${emojiLoadedCount})` : `Custom (${customEmojis.length})`}
             >
-              ★
+              {emojiLoading ? "⏳" : "★"}
             </button>
           )}
         </div>
       )}
 
-      <div className="emoji-picker-grid">
-        {filteredStandard.filter((name) => name in EMOJI_MAP).map((name) => (
-          <button key={name} className="emoji-btn" onClick={() => onSelect(name)} title={`:${name}:`}>
-            {EMOJI_MAP[name]}
-          </button>
-        ))}
-        {(isCustomTab || search) && filteredCustom.map((e) => (
-          <CustomEmojiBtn key={e.id} id={e.id} name={e.name} onSelect={onSelect} />
-        ))}
-      </div>
+      {(isCustomTab || (search && filteredCustom.length > 0 && filteredStandard.length === 0)) ? (
+        <VirtualCustomEmojiGrid
+          emojis={filteredCustom}
+          onSelect={onSelect}
+          loading={emojiLoading}
+          loadedCount={emojiLoadedCount}
+        />
+      ) : (
+        <div className="emoji-picker-grid">
+          {filteredStandard.filter((name) => name in EMOJI_MAP).map((name) => (
+            <button key={name} className="emoji-btn" onClick={() => onSelect(name)} title={`:${name}:`}>
+              {EMOJI_MAP[name]}
+            </button>
+          ))}
+          {search && filteredCustom.slice(0, 40).map((e) => (
+            <CustomEmojiBtn key={e.id} id={e.id} name={e.name} onSelect={onSelect} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

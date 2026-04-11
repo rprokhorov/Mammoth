@@ -413,14 +413,80 @@ function AppContent() {
     store.setCurrentView("main");
   }
 
+  let emojiLoadInProgress = false;
+
   async function loadCustomEmojis(serverId: string, force = false) {
-    if (!force && useCustomEmojiStore.getState().isFresh()) return;
+    if (emojiLoadInProgress) return;
+    const emojiStore = useCustomEmojiStore.getState();
+    if (!force && emojiStore.isFresh()) return;
+    emojiLoadInProgress = true;
+
+    // Restore from disk cache first
     try {
-      const list = await invoke<CustomEmoji[]>("get_custom_emojis", { serverId });
-      useCustomEmojiStore.getState().setEmojis(list);
+      console.log("[emoji] Loading cache for server:", serverId);
+      const cached = await invoke<CustomEmoji[]>("load_emoji_cache", { serverId });
+      console.log(`[emoji] Cache loaded: ${cached.length} emojis from disk`);
+      if (cached.length > 0) {
+        useCustomEmojiStore.getState().setEmojis(cached);
+        useCustomEmojiStore.getState().finishLoading();
+      }
     } catch (e) {
-      console.error("Failed to load custom emojis:", e);
+      console.warn("[emoji] Failed to load cache from disk:", e);
     }
+
+    // Then refresh from server in background
+    refreshCustomEmojisFromServer(serverId).finally(() => {
+      emojiLoadInProgress = false;
+    });
+  }
+
+  async function refreshCustomEmojisFromServer(serverId: string) {
+    useCustomEmojiStore.getState().setLoading(true);
+    const perPage = 200;
+    const maxRetries = 3;
+    let page = 0;
+    let consecutiveFailures = 0;
+    const all: CustomEmoji[] = [];
+
+    while (page < 100) {
+      let batch: CustomEmoji[] | null = null;
+      for (let attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+          batch = await invoke<CustomEmoji[]>("get_custom_emojis", {
+            serverId,
+            page,
+            perPage,
+          });
+          break;
+        } catch (e) {
+          console.warn(`Failed to load custom emojis page ${page} (attempt ${attempt + 1}/${maxRetries}):`, e);
+          if (attempt < maxRetries - 1) {
+            await new Promise((r) => setTimeout(r, (attempt + 1) * 1000));
+          }
+        }
+      }
+      if (batch === null) {
+        consecutiveFailures += 1;
+        if (consecutiveFailures >= 3) {
+          console.error("Too many consecutive failures, stopping emoji refresh");
+          break;
+        }
+        page += 1;
+        continue;
+      }
+      consecutiveFailures = 0;
+      all.push(...batch);
+      if (batch.length < perPage) break;
+      page += 1;
+    }
+    if (all.length > 0) {
+      console.log(`Emoji refresh: loaded ${all.length} emojis from server`);
+      useCustomEmojiStore.getState().setEmojis(all);
+      invoke("save_emoji_cache", { serverId, emojis: all }).catch((e) =>
+        console.warn("Failed to save emoji cache:", e)
+      );
+    }
+    useCustomEmojiStore.getState().finishLoading();
   }
 
   async function loadTeams(serverId: string) {

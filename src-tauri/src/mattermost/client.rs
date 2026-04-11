@@ -1498,8 +1498,12 @@ impl MattermostClient {
     }
 
     pub async fn get_custom_emojis(&self, page: u32, per_page: u32) -> Result<Vec<serde_json::Value>, AppError> {
+        let auth = self.auth_header()?;
         let resp = self
-            .get_authenticated(&format!("/emoji?page={}&per_page={}&sort=name", page, per_page))
+            .http_slow
+            .get(self.api_url(&format!("/emoji?page={}&per_page={}&sort=name", page, per_page)))
+            .header(header::AUTHORIZATION, &auth)
+            .send()
             .await?;
         if !resp.status().is_success() {
             let status = resp.status().as_u16();
