@@ -153,15 +153,7 @@ function AppContent() {
     loadServers();
   }, []);
 
-  // Listen for menu:shortcuts event from native menu
-  useEffect(() => {
-    const unlisten = listen("menu:shortcuts", () => {
-      setShowShortcutsModal(true);
-    });
-    return () => { unlisten.then((fn) => fn()); };
-  }, []);
-
-  // Navigate to channel when notification is clicked (emitted from Rust)
+  // Navigate to channel when notification is clicked (emitted from Rust delegate)
   useEffect(() => {
     const unlisten = listen<string>("notif:navigate-channel", (event) => {
       console.log("[notif] navigate-channel:", event.payload);
@@ -169,6 +161,25 @@ function AppContent() {
     });
     return () => { unlisten.then((fn) => fn()); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Check for pending notification from cold-start click
+  useEffect(() => {
+    invoke<string | null>("check_pending_notification").then((channelId) => {
+      if (channelId) {
+        console.log("[notif] pending cold-start channel:", channelId);
+        handleSelectChannel(channelId);
+      }
+    }).catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Listen for menu:shortcuts event from native menu
+  useEffect(() => {
+    const unlisten = listen("menu:shortcuts", () => {
+      setShowShortcutsModal(true);
+    });
+    return () => { unlisten.then((fn) => fn()); };
   }, []);
 
   // Listen for interactive dialog open events

@@ -1,6 +1,8 @@
 mod commands;
 mod errors;
 mod mattermost;
+#[cfg(target_os = "macos")]
+mod notifications;
 mod state;
 mod storage;
 mod tray;
@@ -11,43 +13,26 @@ use tauri::{
 };
 use state::AppState;
 
-/// Initialize mac_notification_sys once
-#[cfg(target_os = "macos")]
-static NOTIF_INIT: std::sync::Once = std::sync::Once::new();
+#[tauri::command]
+fn show_notification(title: String, body: String, channel_id: String) {
+    #[cfg(target_os = "macos")]
+    notifications::send_notification(&title, &body, &channel_id);
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = (title, body, channel_id);
+    }
+}
 
 #[tauri::command]
-fn show_notification(app: tauri::AppHandle, title: String, body: String, channel_id: String) {
-    std::thread::spawn(move || {
-        #[cfg(target_os = "macos")]
-        {
-            use mac_notification_sys::{Notification, NotificationResponse};
-
-            // Set application once — use com.apple.Terminal to avoid "Choose Application" dialog
-            NOTIF_INIT.call_once(|| {
-                let _ = mac_notification_sys::set_application("com.apple.Terminal");
-            });
-
-            // send() with wait_for_click blocks until user interacts with the notification
-            let response = Notification::default()
-                .title(&title)
-                .message(&body)
-                .wait_for_click(true)
-                .send();
-
-            if let Ok(NotificationResponse::Click) = response {
-                if let Some(window) = app.get_webview_window("main") {
-                    let _ = window.show();
-                    let _ = window.unminimize();
-                    let _ = window.set_focus();
-                    let _ = window.emit("notif:navigate-channel", &channel_id);
-                }
-            }
-        }
-        #[cfg(not(target_os = "macos"))]
-        {
-            let _ = (app, title, body, channel_id);
-        }
-    });
+fn check_pending_notification() -> Option<String> {
+    #[cfg(target_os = "macos")]
+    {
+        notifications::take_pending_channel_id()
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        None
+    }
 }
 
 #[tauri::command]
@@ -130,6 +115,10 @@ pub fn run() {
                 )?;
             }
 
+            // Set up macOS notification delegate
+            #[cfg(target_os = "macos")]
+            notifications::setup_notification_delegate(app.handle().clone());
+
             // Create system tray
             if let Err(e) = tray::create_tray(app.handle()) {
                 log::warn!("Failed to create tray: {}", e);
@@ -191,9 +180,6 @@ pub fn run() {
             commands::edit_post,
             commands::delete_post,
             commands::do_post_action,
-            commands::submit_dialog,
-            commands::poll_dialog,
-            commands::fetch_dialog_by_trigger,
             commands::autocomplete_slash_commands,
             commands::execute_slash_command,
             // Threads
@@ -259,10 +245,11 @@ pub fn run() {
             commands::get_server_version,
             commands::clear_app_cache,
             commands::open_url,
-            // Tray / Badge
+            // Tray / Badge / Notifications
             set_badge_count,
             show_main_window,
             show_notification,
+            check_pending_notification,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

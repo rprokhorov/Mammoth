@@ -170,8 +170,6 @@ function handlePosted(
         ? post.message.slice(0, 100) + "..."
         : post.message;
 
-      // Show notification via Rust — uses mac_notification_sys with wait_for_click
-      // which blocks the thread until user clicks, then emits notif:navigate-channel
       invoke("show_notification", {
         title: `${senderName} in ${channelName}`,
         body: preview,
