@@ -15,7 +15,7 @@ interface ReactionsBarProps {
 }
 
 // Renders a single emoji — custom (img) or standard (unicode)
-const ReactionEmoji = memo(function ReactionEmoji({ name }: { name: string }) {
+export const ReactionEmoji = memo(function ReactionEmoji({ name }: { name: string }) {
   const emojiId = useCustomEmojiStore((s) => s.emojis.find((e) => e.name === name)?.id ?? null);
   const imgUrl = useCustomEmojiImage(emojiId);
 

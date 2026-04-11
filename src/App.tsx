@@ -16,6 +16,7 @@ import { MessageComposer } from "@/components/message/MessageComposer";
 import { ThreadPanel } from "@/components/message/ThreadPanel";
 import { TypingIndicator } from "@/components/message/TypingIndicator";
 import { ThreadsView } from "@/components/message/ThreadsView";
+import { ReactionsView } from "@/components/message/ReactionsView";
 import { useThreadsStore, type UserThread } from "@/stores/threadsStore";
 import { useTabsStore } from "@/stores/tabsStore";
 import { useCustomEmojiStore, type CustomEmoji } from "@/stores/customEmojiStore";
@@ -727,6 +728,8 @@ function AppContent() {
               <div className="message-area">
                 {mainSubView === "threads" && activeServerId && activeTeamId ? (
                   <ThreadsView serverId={activeServerId} teamId={activeTeamId} currentUserId={currentUserId} />
+                ) : mainSubView === "reactions" && activeServerId ? (
+                  <ReactionsView currentUserId={currentUserId} serverId={activeServerId} />
                 ) : activeChannel && activeServerId ? (
                   <>
                     <MessageList

@@ -217,6 +217,7 @@ pub fn run() {
             commands::add_reaction,
             commands::remove_reaction,
             commands::get_reactions,
+            commands::get_reactions_on_my_posts,
             commands::pin_post,
             commands::unpin_post,
             commands::save_post,

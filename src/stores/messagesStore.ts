@@ -37,6 +37,8 @@ interface MessagesState {
   loading: boolean;
   // Editing post id
   editingPostId: string | null;
+  // Post to scroll to after navigation
+  scrollToPostId: string | null;
 
   setChannelPosts: (channelId: string, order: string[], posts: Record<string, PostData>) => void;
   incrementReplyCount: (rootPostId: string) => void;
@@ -46,6 +48,7 @@ interface MessagesState {
   prependOlderPosts: (channelId: string, order: string[], posts: Record<string, PostData>) => void;
   setLoading: (loading: boolean) => void;
   setEditingPostId: (postId: string | null) => void;
+  setScrollToPostId: (postId: string | null) => void;
   clearChannel: (channelId: string) => void;
 }
 
@@ -54,6 +57,7 @@ export const useMessagesStore = create<MessagesState>((set) => ({
   posts: {},
   loading: false,
   editingPostId: null,
+  scrollToPostId: null,
 
   setChannelPosts: (channelId, order, posts) =>
     set((state) => {
@@ -178,6 +182,7 @@ export const useMessagesStore = create<MessagesState>((set) => ({
 
   setLoading: (loading) => set({ loading }),
   setEditingPostId: (editingPostId) => set({ editingPostId }),
+  setScrollToPostId: (scrollToPostId) => set({ scrollToPostId }),
   clearChannel: (channelId) =>
     set((state) => {
       const newOrder = { ...state.orderByChannel };

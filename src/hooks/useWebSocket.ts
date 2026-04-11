@@ -9,6 +9,7 @@ import { useUiStore } from "@/stores/uiStore";
 import { useMessagesStore, type PostData } from "@/stores/messagesStore";
 import { useThreadsStore } from "@/stores/threadsStore";
 import { useTabsStore } from "@/stores/tabsStore";
+import { useReactionsStore } from "@/stores/reactionsStore";
 
 interface WsStatusPayload {
   server_id: string;
@@ -83,6 +84,9 @@ export function useWebSocket() {
           break;
         case "ephemeral_message":
           handleEphemeralMessage(data, broadcast);
+          break;
+        case "reaction_added":
+          handleReactionAdded(data, broadcast);
           break;
         case "open_dialog":
           handleOpenDialog(data, server_id);
@@ -292,6 +296,50 @@ function handleEphemeralMessage(
     if (!post.channel_id) return;
     // Ephemeral posts are added to the channel feed just like regular posts
     useMessagesStore.getState().addPost(post);
+  } catch {
+    // ignore parse errors
+  }
+}
+
+function handleReactionAdded(
+  data: Record<string, unknown>,
+  broadcast: { channel_id: string; user_id: string },
+) {
+  try {
+    const reactionStr = data.reaction as string | undefined;
+    if (!reactionStr) return;
+    const reaction = JSON.parse(reactionStr) as {
+      user_id: string;
+      post_id: string;
+      emoji_name: string;
+      create_at: number;
+    };
+
+    // Only notify if someone else reacted to MY post or MY thread reply
+    const currentUserId = useUiStore.getState().currentUserId;
+    if (!currentUserId) return;
+    // Don't notify about own reactions
+    if (reaction.user_id === currentUserId) return;
+
+    // Check if the post belongs to the current user
+    const posts = useMessagesStore.getState().posts;
+    const post = posts[reaction.post_id];
+    if (!post) return;
+    if (post.user_id !== currentUserId) return;
+
+    const channelId = broadcast.channel_id || post.channel_id;
+
+    useReactionsStore.getState().addNotification({
+      id: `${reaction.post_id}_${reaction.user_id}_${reaction.emoji_name}_${reaction.create_at}`,
+      postId: reaction.post_id,
+      channelId,
+      emojiName: reaction.emoji_name,
+      reactorUserId: reaction.user_id,
+      postAuthorUserId: post.user_id,
+      postMessage: post.message,
+      createAt: reaction.create_at,
+      read: false,
+    });
   } catch {
     // ignore parse errors
   }

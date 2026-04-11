@@ -343,6 +343,30 @@ export function MessageList({
     setUnreadInfo(null);
   }
 
+  // Scroll to a specific post when scrollToPostId is set
+  const scrollToPostId = useMessagesStore((s) => s.scrollToPostId);
+  useEffect(() => {
+    if (!scrollToPostId) return;
+    // Wait a tick for the DOM to be ready after channel switch
+    const timer = setTimeout(() => {
+      const container = scrollRef.current;
+      const el = container?.querySelector<HTMLElement>(
+        `[data-post-id="${scrollToPostId}"]`,
+      );
+      if (container && el) {
+        shouldPinToBottom.current = false;
+        setIsNearBottom(false);
+        const targetTop = el.offsetTop - container.offsetTop;
+        container.scrollTop = targetTop;
+        // Briefly highlight the post
+        el.classList.add("highlight-post");
+        setTimeout(() => el.classList.remove("highlight-post"), 2000);
+      }
+      useMessagesStore.getState().setScrollToPostId(null);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [scrollToPostId, order]);
+
   // Build post list (order is newest-first from API, reverse for display)
   // Memoize to avoid rebuilding on unrelated state changes
   const elements = useMemo(() => {
