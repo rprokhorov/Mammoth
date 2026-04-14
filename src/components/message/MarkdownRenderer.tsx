@@ -15,6 +15,12 @@ function escapeAttr(value: string): string {
     .replace(/>/g, "&gt;");
 }
 
+const MERMAID_PLACEHOLDER = "<!--MERMAID_BLOCK_";
+const MERMAID_PLACEHOLDER_END = "-->";
+
+// Mermaid blocks collected during a single renderMarkdown call
+let collectedMermaidBlocks: string[] = [];
+
 // Custom renderer to handle Mattermost-specific elements
 const renderer = new Renderer();
 
@@ -27,8 +33,13 @@ renderer.link = ({ href, title, text }) => {
   return `<a href="${safeHref}"${titleAttr} target="_blank" rel="noopener noreferrer">${text}</a>`;
 };
 
-// Code blocks with language class
+// Code blocks — intercept mermaid, render others normally
 renderer.code = ({ text, lang }) => {
+  if (lang === "mermaid") {
+    const idx = collectedMermaidBlocks.length;
+    collectedMermaidBlocks.push(text);
+    return `${MERMAID_PLACEHOLDER}${idx}${MERMAID_PLACEHOLDER_END}`;
+  }
   const escaped = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   const langClass = lang ? ` class="language-${escapeAttr(lang)}"` : "";
   return `<pre class="code-block"><code${langClass}>${escaped}</code></pre>`;
@@ -41,29 +52,9 @@ renderer.codespan = ({ text }) => {
 
 marked.setOptions({ renderer, gfm: true, breaks: true });
 
-const MERMAID_PLACEHOLDER = "%%MERMAID_BLOCK_";
+function renderMarkdown(text: string): { html: string; mermaidBlocks: string[] } {
+  collectedMermaidBlocks = [];
 
-interface MermaidEntry {
-  code: string;
-}
-
-function extractMermaidBlocks(text: string): {
-  processed: string;
-  mermaidBlocks: MermaidEntry[];
-} {
-  const mermaidBlocks: MermaidEntry[] = [];
-  const processed = text.replace(
-    /```mermaid\s*\n([\s\S]*?)```/g,
-    (_match, code: string) => {
-      const idx = mermaidBlocks.length;
-      mermaidBlocks.push({ code: code.trimEnd() });
-      return `${MERMAID_PLACEHOLDER}${idx}%%`;
-    }
-  );
-  return { processed, mermaidBlocks };
-}
-
-function renderMarkdown(text: string): string {
   let processed = text
     .replace(/@(\w+)/g, '<span class="mention">@$1</span>')
     .replace(/~([\w-]+)/g, '<span class="channel-link">~$1</span>')
@@ -73,35 +64,29 @@ function renderMarkdown(text: string): string {
       return unicode.startsWith(":") ? match : unicode;
     });
 
-  return marked.parse(processed) as string;
+  const html = marked.parse(processed) as string;
+  const mermaidBlocks = collectedMermaidBlocks;
+  collectedMermaidBlocks = [];
+  return { html, mermaidBlocks };
 }
 
 export function MarkdownRenderer({ text }: MarkdownRendererProps) {
   const { htmlParts, mermaidBlocks } = useMemo(() => {
-    const { processed, mermaidBlocks } = extractMermaidBlocks(text);
+    const { html, mermaidBlocks } = renderMarkdown(text);
 
     if (mermaidBlocks.length === 0) {
-      return { htmlParts: [renderMarkdown(processed)], mermaidBlocks: [] };
+      return { htmlParts: [html], mermaidBlocks: [] };
     }
 
-    const html = renderMarkdown(processed);
     // Split the HTML by mermaid placeholders
     const parts: string[] = [];
     let remaining = html;
     for (let i = 0; i < mermaidBlocks.length; i++) {
-      const placeholder = `${MERMAID_PLACEHOLDER}${i}%%`;
-      // marked may wrap the placeholder in <p> tags
-      const wrappedPlaceholder = `<p>${placeholder}</p>`;
-      const idx = remaining.indexOf(wrappedPlaceholder);
+      const placeholder = `${MERMAID_PLACEHOLDER}${i}${MERMAID_PLACEHOLDER_END}`;
+      const idx = remaining.indexOf(placeholder);
       if (idx !== -1) {
         parts.push(remaining.slice(0, idx));
-        remaining = remaining.slice(idx + wrappedPlaceholder.length);
-      } else {
-        const plainIdx = remaining.indexOf(placeholder);
-        if (plainIdx !== -1) {
-          parts.push(remaining.slice(0, plainIdx));
-          remaining = remaining.slice(plainIdx + placeholder.length);
-        }
+        remaining = remaining.slice(idx + placeholder.length);
       }
     }
     parts.push(remaining);
@@ -123,7 +108,7 @@ export function MarkdownRenderer({ text }: MarkdownRendererProps) {
         <span key={i}>
           {html && <span dangerouslySetInnerHTML={{ __html: html }} />}
           {i < mermaidBlocks.length && (
-            <MermaidBlock code={mermaidBlocks[i].code} />
+            <MermaidBlock code={mermaidBlocks[i]} />
           )}
         </span>
       ))}

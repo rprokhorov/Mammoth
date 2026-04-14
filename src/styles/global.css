@@ -1518,6 +1518,12 @@ pre.code-block.mermaid-code {
   margin: 0;
   border-radius: 0;
 }
+.mermaid-error {
+  padding: 6px 12px;
+  font-size: 12px;
+  color: var(--error);
+  background: rgba(243, 139, 168, 0.1);
+}
 
 /* Scroll to bottom */
 .scroll-to-bottom {
