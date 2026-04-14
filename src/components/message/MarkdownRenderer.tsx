@@ -1,6 +1,7 @@
 import { marked, Renderer } from "marked";
 import { useMemo } from "react";
 import { emojiNameToUnicode } from "./EmojiPicker";
+import { MermaidBlock } from "./MermaidBlock";
 
 interface MarkdownRendererProps {
   text: string;
@@ -40,6 +41,28 @@ renderer.codespan = ({ text }) => {
 
 marked.setOptions({ renderer, gfm: true, breaks: true });
 
+const MERMAID_PLACEHOLDER = "%%MERMAID_BLOCK_";
+
+interface MermaidEntry {
+  code: string;
+}
+
+function extractMermaidBlocks(text: string): {
+  processed: string;
+  mermaidBlocks: MermaidEntry[];
+} {
+  const mermaidBlocks: MermaidEntry[] = [];
+  const processed = text.replace(
+    /```mermaid\s*\n([\s\S]*?)```/g,
+    (_match, code: string) => {
+      const idx = mermaidBlocks.length;
+      mermaidBlocks.push({ code: code.trimEnd() });
+      return `${MERMAID_PLACEHOLDER}${idx}%%`;
+    }
+  );
+  return { processed, mermaidBlocks };
+}
+
 function renderMarkdown(text: string): string {
   let processed = text
     .replace(/@(\w+)/g, '<span class="mention">@$1</span>')
@@ -54,11 +77,56 @@ function renderMarkdown(text: string): string {
 }
 
 export function MarkdownRenderer({ text }: MarkdownRendererProps) {
-  const html = useMemo(() => renderMarkdown(text), [text]);
+  const { htmlParts, mermaidBlocks } = useMemo(() => {
+    const { processed, mermaidBlocks } = extractMermaidBlocks(text);
+
+    if (mermaidBlocks.length === 0) {
+      return { htmlParts: [renderMarkdown(processed)], mermaidBlocks: [] };
+    }
+
+    const html = renderMarkdown(processed);
+    // Split the HTML by mermaid placeholders
+    const parts: string[] = [];
+    let remaining = html;
+    for (let i = 0; i < mermaidBlocks.length; i++) {
+      const placeholder = `${MERMAID_PLACEHOLDER}${i}%%`;
+      // marked may wrap the placeholder in <p> tags
+      const wrappedPlaceholder = `<p>${placeholder}</p>`;
+      const idx = remaining.indexOf(wrappedPlaceholder);
+      if (idx !== -1) {
+        parts.push(remaining.slice(0, idx));
+        remaining = remaining.slice(idx + wrappedPlaceholder.length);
+      } else {
+        const plainIdx = remaining.indexOf(placeholder);
+        if (plainIdx !== -1) {
+          parts.push(remaining.slice(0, plainIdx));
+          remaining = remaining.slice(plainIdx + placeholder.length);
+        }
+      }
+    }
+    parts.push(remaining);
+    return { htmlParts: parts, mermaidBlocks };
+  }, [text]);
+
+  if (mermaidBlocks.length === 0) {
+    return (
+      <span
+        className="markdown-body"
+        dangerouslySetInnerHTML={{ __html: htmlParts[0] }}
+      />
+    );
+  }
+
   return (
-    <span
-      className="markdown-body"
-      dangerouslySetInnerHTML={{ __html: html }}
-    />
+    <span className="markdown-body">
+      {htmlParts.map((html, i) => (
+        <span key={i}>
+          {html && <span dangerouslySetInnerHTML={{ __html: html }} />}
+          {i < mermaidBlocks.length && (
+            <MermaidBlock code={mermaidBlocks[i].code} />
+          )}
+        </span>
+      ))}
+    </span>
   );
 }

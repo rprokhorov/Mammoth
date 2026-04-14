@@ -1469,6 +1469,56 @@ button.secondary:hover:not(:disabled) {
   margin: 8px 0;
 }
 
+/* Mermaid diagrams */
+.mermaid-wrapper {
+  margin: 8px 0;
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--bg-tertiary);
+}
+.mermaid-tabs {
+  display: flex;
+  gap: 0;
+  background: var(--bg-secondary);
+  padding: 4px 4px 0;
+}
+.mermaid-tab {
+  padding: 4px 14px;
+  font-size: 12px;
+  font-family: inherit;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: 4px 4px 0 0;
+  transition: background 0.15s, color 0.15s;
+}
+.mermaid-tab:hover:not(:disabled) {
+  color: var(--text-secondary);
+}
+.mermaid-tab.active {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+.mermaid-tab:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.mermaid-block {
+  padding: 16px;
+  overflow-x: auto;
+  display: flex;
+  justify-content: center;
+}
+.mermaid-block svg {
+  max-width: 100%;
+  height: auto;
+}
+pre.code-block.mermaid-code {
+  margin: 0;
+  border-radius: 0;
+}
+
 /* Scroll to bottom */
 .scroll-to-bottom {
   position: absolute;
