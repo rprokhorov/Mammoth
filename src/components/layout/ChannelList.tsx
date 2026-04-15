@@ -609,7 +609,7 @@ export function ChannelList({ onSelectChannel, onCreateChannel, serverId, curren
                 .map((id) => channelMap.get(id))
                 .filter((ch): ch is ChannelInfo => ch !== undefined);
               const catChannels = cat.category_type === "direct_messages"
-                ? allCatChannels.slice(0, dmLimit)
+                ? [...allCatChannels].sort((a, b) => b.last_post_at - a.last_post_at).slice(0, dmLimit)
                 : allCatChannels;
 
               const isCollapsed = collapsedCategories.has(cat.id);
