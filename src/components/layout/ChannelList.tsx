@@ -63,7 +63,7 @@ export function ChannelList({ onSelectChannel, onCreateChannel, serverId, curren
 
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
-      if ((e.metaKey || e.ctrlKey) && e.key === "p") {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
         e.preventDefault();
         setShowQuickSwitcher((v) => !v);
       }
@@ -535,11 +535,11 @@ export function ChannelList({ onSelectChannel, onCreateChannel, serverId, curren
       <button
         className="channel-item find-nav-btn"
         onClick={() => setShowQuickSwitcher(true)}
-        title="Find channels or people (⌘P)"
+        title="Find channels or people (⌘K)"
       >
         <span className="channel-prefix">🔍</span>
         <span className="channel-name">Find</span>
-        <span className="quick-switcher-shortcut">⌘P</span>
+        <span className="quick-switcher-shortcut">⌘K</span>
       </button>
       <button
         className={`channel-item threads-nav-btn ${mainSubView === "threads" ? "active" : ""}`}

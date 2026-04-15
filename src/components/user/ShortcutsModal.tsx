@@ -11,7 +11,7 @@ const SHORTCUTS = [
   {
     category: "Navigation",
     items: [
-      { keys: `${mod}+P`, action: "Quick Switcher — open channel or DM" },
+      { keys: `${mod}+K`, action: "Quick Switcher — open channel or DM" },
       { keys: `${mod}+F`, action: "Search messages" },
       { keys: `${mod}+Shift+T`, action: "Toggle Threads view" },
       { keys: `${mod}+/`, action: "Show keyboard shortcuts" },
