@@ -73,6 +73,7 @@ export function ChannelInfoPanel({
   const channel = channels.find((ch) => ch.id === activeChannelId);
 
   const [subPanel, setSubPanel] = useState<SubPanel>(null);
+  const [linkCopied, setLinkCopied] = useState(false);
 
   // Members state
   const [members, setMembers] = useState<ChannelMember[]>([]);
@@ -176,6 +177,8 @@ export function ChannelInfoPanel({
     const teamName = team?.name ?? "";
     const link = `${baseUrl}/${teamName}/channels/${channel?.name ?? ""}`;
     navigator.clipboard.writeText(link).catch(console.error);
+    setLinkCopied(true);
+    setTimeout(() => setLinkCopied(false), 2000);
   }
 
   function getUserDisplayName(user: UserInfo): string {
@@ -234,12 +237,22 @@ export function ChannelInfoPanel({
               </svg>
               <span>Mute</span>
             </button>
-            <button className="channel-info-action-btn" onClick={handleCopyLink} title="Copy Link">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-              </svg>
-              <span>Copy Link</span>
+            <button
+              className={`channel-info-action-btn ${linkCopied ? "copy-link-copied" : ""}`}
+              onClick={handleCopyLink}
+              title="Copy Link"
+            >
+              {linkCopied ? (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+              ) : (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                  <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+                </svg>
+              )}
+              <span>{linkCopied ? "Copied!" : "Copy Link"}</span>
             </button>
           </div>
 

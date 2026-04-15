@@ -540,6 +540,10 @@ button.secondary:hover:not(:disabled) {
 .channel-info-action-btn.active {
   color: var(--accent);
 }
+.channel-info-action-btn.copy-link-copied {
+  color: #3db887;
+  transition: color 0.2s;
+}
 .channel-info-section {
   display: flex;
   flex-direction: column;
