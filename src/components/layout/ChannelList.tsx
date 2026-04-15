@@ -538,7 +538,7 @@ export function ChannelList({ onSelectChannel, onCreateChannel, serverId, curren
         title="Find channels or people (⌘K)"
       >
         <span className="channel-prefix">🔍</span>
-        <span className="channel-name">Find</span>
+        <span className="channel-name">Find channel or user</span>
         <span className="quick-switcher-shortcut">⌘K</span>
       </button>
       <button
