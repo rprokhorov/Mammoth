@@ -186,6 +186,7 @@ pub async fn execute_slash_command(
     state: State<'_, AppState>,
     server_id: String,
     channel_id: String,
+    team_id: Option<String>,
     command: String,
 ) -> Result<serde_json::Value, AppError> {
     let client = {
@@ -196,5 +197,5 @@ pub async fn execute_slash_command(
         server.client.clone()
     };
 
-    client.execute_command(&channel_id, &command).await
+    client.execute_command(&channel_id, team_id.as_deref(), &command).await
 }

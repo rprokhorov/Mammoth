@@ -528,13 +528,20 @@ impl MattermostClient {
     pub async fn execute_command(
         &self,
         channel_id: &str,
+        team_id: Option<&str>,
         command: &str,
     ) -> Result<serde_json::Value, AppError> {
         let auth = self.auth_header()?;
-        let body = serde_json::json!({
+        let mut body = serde_json::json!({
             "channel_id": channel_id,
             "command": command,
         });
+        if let Some(tid) = team_id {
+            if !tid.is_empty() {
+                body["team_id"] = serde_json::json!(tid);
+            }
+        }
+        let body = body;
         let resp = self
             .http
             .post(self.api_url("/commands/execute"))
