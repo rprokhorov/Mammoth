@@ -75,11 +75,17 @@ export function MessageComposer({ channelId, serverId }: MessageComposerProps) {
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const mentionTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
   const mentionListRef = useRef<HTMLDivElement>(null);
+
+  // Channel autocomplete (~channel)
+  const [channelQuery, setChannelQuery] = useState<string | null>(null);
+  const [channelResults, setChannelResults] = useState<{ id: string; name: string; display_name: string; channel_type: string }[]>([]);
+  const [channelSelectedIdx, setChannelSelectedIdx] = useState(0);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const emojiTriggerRef = useRef<HTMLButtonElement>(null);
   const composerRef = useRef<HTMLDivElement>(null);
 
   const activeTeamId = useUiStore((s) => s.activeTeamId);
+  const allChannels = useUiStore((s) => s.channels);
 
   const editingPostId = useMessagesStore((s) => s.editingPostId);
   const posts = useMessagesStore((s) => s.posts);
@@ -198,6 +204,49 @@ export function MessageComposer({ channelId, serverId }: MessageComposerProps) {
       if (mentionTimerRef.current) clearTimeout(mentionTimerRef.current);
     }
   }, [text, activeTeamId, serverId, channelId]);
+
+  // Channel autocomplete (~channel)
+  useEffect(() => {
+    const ta = textareaRef.current;
+    if (!ta) return;
+    const cursor = ta.selectionStart;
+    const before = text.slice(0, cursor);
+    const match = before.match(/~([\p{L}\d._-]*)$/u);
+    if (match) {
+      const query = match[1].toLowerCase();
+      setChannelQuery(query);
+      const results = allChannels
+        .filter((ch) => ch.channel_type === "O" || ch.channel_type === "P")
+        .filter((ch) =>
+          ch.name.toLowerCase().includes(query) ||
+          ch.display_name.toLowerCase().includes(query)
+        )
+        .slice(0, 10);
+      setChannelResults(results);
+      setChannelSelectedIdx(0);
+    } else {
+      setChannelQuery(null);
+      setChannelResults([]);
+    }
+  }, [text, allChannels]);
+
+  function insertChannel(ch: { id: string; name: string; display_name: string }) {
+    const ta = textareaRef.current;
+    if (!ta || channelQuery === null) return;
+    const cursor = ta.selectionStart;
+    const before = text.slice(0, cursor);
+    const after = text.slice(cursor);
+    const tildeIdx = before.lastIndexOf("~");
+    const newText = before.slice(0, tildeIdx) + `~${ch.name} ` + after;
+    setText(newText);
+    setChannelQuery(null);
+    setChannelResults([]);
+    requestAnimationFrame(() => {
+      const newCursor = tildeIdx + ch.name.length + 2;
+      ta.setSelectionRange(newCursor, newCursor);
+      ta.focus();
+    });
+  }
 
   function insertMention(user: MentionUser) {
     const ta = textareaRef.current;
@@ -424,6 +473,14 @@ export function MessageComposer({ channelId, serverId }: MessageComposerProps) {
 
   function handleKeyDown(e: React.KeyboardEvent) {
     if (handleMarkdownShortcut(e, textareaRef, text, setText)) return;
+    if (channelResults.length > 0) {
+      if (e.key === "ArrowDown") { e.preventDefault(); setChannelSelectedIdx((i) => Math.min(i + 1, channelResults.length - 1)); return; }
+      if (e.key === "ArrowUp") { e.preventDefault(); setChannelSelectedIdx((i) => Math.max(i - 1, 0)); return; }
+      if (e.key === "Tab" || e.key === "Enter") {
+        if (channelResults[channelSelectedIdx]) { e.preventDefault(); insertChannel(channelResults[channelSelectedIdx]); return; }
+      }
+      if (e.key === "Escape") { e.preventDefault(); setChannelQuery(null); setChannelResults([]); return; }
+    }
     if (allMentionResults.length > 0) {
       if (e.key === "ArrowDown") { e.preventDefault(); setMentionSelectedIdx((i) => Math.min(i + 1, allMentionResults.length - 1)); return; }
       if (e.key === "ArrowUp") { e.preventDefault(); setMentionSelectedIdx((i) => Math.max(i - 1, 0)); return; }
@@ -489,6 +546,24 @@ export function MessageComposer({ channelId, serverId }: MessageComposerProps) {
               <span className="slash-autocomplete-trigger">{cmd.Complete}</span>
               <span className="slash-autocomplete-hint">{cmd.Hint}</span>
               <span className="slash-autocomplete-desc">{cmd.Description}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Channel autocomplete */}
+      {channelResults.length > 0 && (
+        <div className="mention-autocomplete">
+          {channelResults.map((ch, i) => (
+            <button
+              key={ch.id}
+              className={`mention-autocomplete-item ${i === channelSelectedIdx ? "selected" : ""}`}
+              onMouseDown={(e) => { e.preventDefault(); insertChannel(ch); }}
+            >
+              <span className="mention-autocomplete-username">{ch.channel_type === "P" ? "🔒" : "#"} {ch.name}</span>
+              {ch.display_name !== ch.name && (
+                <span className="mention-autocomplete-name">{ch.display_name}</span>
+              )}
             </button>
           ))}
         </div>
