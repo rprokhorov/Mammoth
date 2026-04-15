@@ -61,6 +61,13 @@ export function ChannelList({ onSelectChannel, onCreateChannel, serverId, curren
   // Quick switcher
   const [showQuickSwitcher, setShowQuickSwitcher] = useState(false);
 
+  // DM limit
+  const DM_LIMIT_OPTIONS = [10, 15, 20, 40];
+  const [dmLimit, setDmLimit] = useState<number>(() => {
+    const saved = localStorage.getItem("dm_limit");
+    return saved ? parseInt(saved, 10) : 20;
+  });
+
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
@@ -504,6 +511,24 @@ export function ChannelList({ onSelectChannel, onCreateChannel, serverId, curren
           <span className="channel-group-title">{getCategoryDisplayName(cat)}</span>
         )}
 
+        {cat.category_type === "direct_messages" && (
+          <select
+            className="dm-limit-select"
+            value={dmLimit}
+            onClick={(e) => e.stopPropagation()}
+            onChange={(e) => {
+              const val = parseInt(e.target.value, 10);
+              setDmLimit(val);
+              localStorage.setItem("dm_limit", String(val));
+            }}
+            title="Max DMs to show"
+          >
+            {DM_LIMIT_OPTIONS.map((n) => (
+              <option key={n} value={n}>{n}</option>
+            ))}
+          </select>
+        )}
+
         <button
           className="category-menu-btn"
           onClick={(e) => {
@@ -580,9 +605,12 @@ export function ChannelList({ onSelectChannel, onCreateChannel, serverId, curren
           {[...sidebarCategories]
             .sort((a, b) => a.sort_order - b.sort_order)
             .map((cat) => {
-              const catChannels = cat.channel_ids
+              const allCatChannels = cat.channel_ids
                 .map((id) => channelMap.get(id))
                 .filter((ch): ch is ChannelInfo => ch !== undefined);
+              const catChannels = cat.category_type === "direct_messages"
+                ? allCatChannels.slice(0, dmLimit)
+                : allCatChannels;
 
               const isCollapsed = collapsedCategories.has(cat.id);
 
@@ -689,7 +717,7 @@ export function ChannelList({ onSelectChannel, onCreateChannel, serverId, curren
           />
           <ChannelGroup
             title="Direct Messages"
-            channels={dmChannels}
+            channels={dmChannels.slice(0, dmLimit)}
             activeId={activeChannelId}
             getDisplayName={getDisplayName}
             getPrefix={() => ""}

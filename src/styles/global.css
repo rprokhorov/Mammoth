@@ -3115,6 +3115,19 @@ pre.code-block.mermaid-code {
   color: var(--text-muted);
 }
 
+.dm-limit-select {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 11px;
+  cursor: pointer;
+  padding: 0 2px;
+  margin-right: 2px;
+  outline: none;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
 /* ===== Modal Overlay ===== */
 .modal-overlay {
   position: fixed;
