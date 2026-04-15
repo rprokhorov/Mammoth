@@ -28,8 +28,11 @@ interface ThreadsState {
   userThreadsUnread: number;
   // Loading
   threadLoading: boolean;
+  // Post to scroll to + highlight inside the open thread
+  scrollToThreadPostId: string | null;
 
   setActiveThread: (threadId: string | null) => void;
+  setScrollToThreadPostId: (postId: string | null) => void;
   setThreadData: (rootId: string, order: string[], posts: Record<string, PostData>) => void;
   setThreadParticipants: (rootId: string, userIds: string[]) => void;
   addThreadReply: (post: PostData) => void;
@@ -52,8 +55,10 @@ export const useThreadsStore = create<ThreadsState>((set) => ({
   userThreadsTotal: 0,
   userThreadsUnread: 0,
   threadLoading: false,
+  scrollToThreadPostId: null,
 
   setActiveThread: (threadId) => set({ activeThreadId: threadId }),
+  setScrollToThreadPostId: (postId) => set({ scrollToThreadPostId: postId }),
 
   setThreadParticipants: (rootId, userIds) =>
     set((state) => ({

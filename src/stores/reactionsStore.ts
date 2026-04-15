@@ -3,6 +3,7 @@ import { create } from "zustand";
 export interface ReactionNotification {
   id: string; // unique id for the notification
   postId: string;
+  rootId: string; // non-empty if the post is a thread reply
   channelId: string;
   emojiName: string;
   reactorUserId: string;

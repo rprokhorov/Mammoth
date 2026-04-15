@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { useReactionsStore, type ReactionNotification } from "@/stores/reactionsStore";
 import { useUiStore } from "@/stores/uiStore";
 import { useMessagesStore } from "@/stores/messagesStore";
+import { useThreadsStore } from "@/stores/threadsStore";
 import { useTabsStore } from "@/stores/tabsStore";
 import { primeLastViewedSnapshot } from "@/stores/lastViewedSnapshot";
 import { ReactionEmoji } from "@/components/message/ReactionsBar";
@@ -13,6 +14,7 @@ interface ReactionOnMyPost {
   post_id: string;
   post_message: string;
   channel_id: string;
+  root_id: string;
   reactor_user_id: string;
   emoji_name: string;
   create_at: number;
@@ -63,6 +65,7 @@ export function ReactionsView({ currentUserId, serverId }: ReactionsViewProps) {
           store.addNotification({
             id,
             postId: r.post_id,
+            rootId: r.root_id ?? "",
             channelId: r.channel_id,
             emojiName: r.emoji_name,
             reactorUserId: r.reactor_user_id,
@@ -91,7 +94,7 @@ export function ReactionsView({ currentUserId, serverId }: ReactionsViewProps) {
     navigateToChannel(channelId);
   }
 
-  function navigateToChannel(channelId: string, postId?: string) {
+  function navigateToChannel(channelId: string, postId?: string, rootId?: string) {
     const uiStore = useUiStore.getState();
     const ch = uiStore.channels.find((c) => c.id === channelId);
     if (ch) primeLastViewedSnapshot(ch.id, ch.last_viewed_at);
@@ -99,13 +102,20 @@ export function ReactionsView({ currentUserId, serverId }: ReactionsViewProps) {
     uiStore.setMainSubView("channels");
     useTabsStore.getState().navigateDefaultTab(channelId);
     if (postId) {
-      useMessagesStore.getState().setScrollToPostId(postId);
+      if (rootId) {
+        // Post is a thread reply — open the thread and highlight the specific reply
+        const threadsStore = useThreadsStore.getState();
+        threadsStore.setActiveThread(rootId);
+        threadsStore.setScrollToThreadPostId(postId);
+      } else {
+        useMessagesStore.getState().setScrollToPostId(postId);
+      }
     }
   }
 
-  function handleGoToPost(e: React.MouseEvent, channelId: string, postId: string) {
+  function handleGoToPost(e: React.MouseEvent, channelId: string, postId: string, rootId?: string) {
     e.stopPropagation();
-    navigateToChannel(channelId, postId);
+    navigateToChannel(channelId, postId, rootId);
   }
 
   async function handleOpenDm(e: React.MouseEvent, userId: string) {
@@ -185,7 +195,7 @@ export function ReactionsView({ currentUserId, serverId }: ReactionsViewProps) {
               <div
                 key={n.id}
                 className="thread-list-item"
-                onClick={(e) => handleGoToPost(e, n.channelId, n.postId)}
+                onClick={(e) => handleGoToPost(e, n.channelId, n.postId, n.rootId || undefined)}
                 style={{ cursor: "pointer" }}
               >
                 <div

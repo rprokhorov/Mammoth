@@ -380,6 +380,7 @@ function handleReactionAdded(
     useReactionsStore.getState().addNotification({
       id: `${reaction.post_id}_${reaction.user_id}_${reaction.emoji_name}_${reaction.create_at}`,
       postId: reaction.post_id,
+      rootId: post.root_id ?? "",
       channelId,
       emojiName: reaction.emoji_name,
       reactorUserId: reaction.user_id,

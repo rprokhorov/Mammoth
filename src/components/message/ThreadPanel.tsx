@@ -68,6 +68,7 @@ export function ThreadPanel({ serverId, currentUserId, width }: ThreadPanelProps
   const emojiTriggerRef = useRef<HTMLButtonElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const composerRef = useRef<HTMLDivElement>(null);
+  const panelBodyRef = useRef<HTMLDivElement>(null);
 
   // Reset edit state when thread changes
   useEffect(() => {
@@ -161,6 +162,23 @@ export function ThreadPanel({ serverId, currentUserId, width }: ThreadPanelProps
       bottomRef.current?.scrollIntoView({ behavior: "smooth" });
     });
   }, [order.length]);
+
+  // Scroll to and highlight a specific post inside the thread (from Reactions navigation)
+  const scrollToThreadPostId = useThreadsStore((s) => s.scrollToThreadPostId);
+  useEffect(() => {
+    if (!scrollToThreadPostId) return;
+    const timer = setTimeout(() => {
+      const container = panelBodyRef.current;
+      const el = container?.querySelector<HTMLElement>(`[data-post-id="${scrollToThreadPostId}"]`);
+      if (container && el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        el.classList.add("highlight-post");
+        setTimeout(() => el.classList.remove("highlight-post"), 2000);
+      }
+      useThreadsStore.getState().setScrollToThreadPostId(null);
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [scrollToThreadPostId, order]);
 
   useTauriDragDrop(
     composerRef,
@@ -461,7 +479,7 @@ export function ThreadPanel({ serverId, currentUserId, width }: ThreadPanelProps
         </button>
       </div>
 
-      <div className="thread-panel-body">
+      <div className="thread-panel-body" ref={panelBodyRef}>
         {threadLoading && order.length === 0 ? (
           <div className="thread-loading">
             <div className="spinner small" />
