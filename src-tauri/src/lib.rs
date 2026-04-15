@@ -172,6 +172,7 @@ pub fn run() {
             commands::get_channel_last_viewed_at,
             commands::get_users_by_ids,
             commands::autocomplete_users,
+            commands::autocomplete_users_in_channel,
             commands::search_users,
             // Messages
             commands::get_posts,

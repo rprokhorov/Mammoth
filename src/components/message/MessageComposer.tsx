@@ -6,6 +6,7 @@ import { useMessagesStore, type PostData } from "@/stores/messagesStore";
 import { useUiStore } from "@/stores/uiStore";
 import { EMOJI_MAP, EmojiPicker } from "./EmojiPicker";
 import { MarkdownToolbar, handleMarkdownShortcut } from "./MarkdownToolbar";
+import { UserAvatar } from "@/components/common/UserAvatar";
 
 interface MessageComposerProps {
   channelId: string;
@@ -33,6 +34,26 @@ interface SlashCommandSuggestion {
   IconData: string;
 }
 
+interface MentionUser {
+  id: string;
+  username: string;
+  first_name: string;
+  last_name: string;
+  nickname: string;
+  is_bot: boolean;
+}
+
+interface MentionAutocompleteResult {
+  in_channel: MentionUser[];
+  out_of_channel: MentionUser[];
+}
+
+function getDisplayName(u: MentionUser): string {
+  if (u.nickname) return u.nickname;
+  if (u.first_name || u.last_name) return `${u.first_name} ${u.last_name}`.trim();
+  return u.username;
+}
+
 const IMAGE_EXTS = ["png", "jpg", "jpeg", "gif", "bmp", "webp"];
 const ALL_EMOJI_NAMES = Object.keys(EMOJI_MAP);
 
@@ -48,6 +69,12 @@ export function MessageComposer({ channelId, serverId }: MessageComposerProps) {
   const [emojiPickerStyle, setEmojiPickerStyle] = useState<React.CSSProperties>({});
   const [slashResults, setSlashResults] = useState<SlashCommandSuggestion[]>([]);
   const [slashSelectedIdx, setSlashSelectedIdx] = useState(0);
+  const [mentionInChannel, setMentionInChannel] = useState<MentionUser[]>([]);
+  const [mentionOutChannel, setMentionOutChannel] = useState<MentionUser[]>([]);
+  const [mentionSelectedIdx, setMentionSelectedIdx] = useState(0);
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+  const mentionTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
+  const mentionListRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const emojiTriggerRef = useRef<HTMLButtonElement>(null);
   const composerRef = useRef<HTMLDivElement>(null);
@@ -133,6 +160,63 @@ export function MessageComposer({ channelId, serverId }: MessageComposerProps) {
       setSlashResults([]);
     }
   }, [text, activeTeamId, serverId, channelId]);
+
+  // Mention autocomplete (@username)
+  useEffect(() => {
+    const ta = textareaRef.current;
+    if (!ta) return;
+    const cursor = ta.selectionStart;
+    const before = text.slice(0, cursor);
+    // Match @query — supports latin, cyrillic, digits, underscores, dots, hyphens
+    const match = before.match(/@([\p{L}\d._-]*)$/u);
+    if (match) {
+      const query = match[1];
+      setMentionQuery(query);
+      if (mentionTimerRef.current) clearTimeout(mentionTimerRef.current);
+      // Debounce the API call
+      mentionTimerRef.current = setTimeout(() => {
+        invoke<MentionAutocompleteResult>("autocomplete_users_in_channel", {
+          serverId,
+          teamId: activeTeamId ?? "",
+          channelId,
+          term: query,
+        })
+          .then((result) => {
+            setMentionInChannel(result.in_channel.slice(0, 10));
+            setMentionOutChannel(result.out_of_channel.slice(0, 10));
+            setMentionSelectedIdx(0);
+          })
+          .catch(() => {
+            setMentionInChannel([]);
+            setMentionOutChannel([]);
+          });
+      }, query.length === 0 ? 0 : 150);
+    } else {
+      setMentionQuery(null);
+      setMentionInChannel([]);
+      setMentionOutChannel([]);
+      if (mentionTimerRef.current) clearTimeout(mentionTimerRef.current);
+    }
+  }, [text, activeTeamId, serverId, channelId]);
+
+  function insertMention(user: MentionUser) {
+    const ta = textareaRef.current;
+    if (!ta || mentionQuery === null) return;
+    const cursor = ta.selectionStart;
+    const before = text.slice(0, cursor);
+    const after = text.slice(cursor);
+    const atIdx = before.lastIndexOf("@");
+    const newText = before.slice(0, atIdx) + `@${user.username} ` + after;
+    setText(newText);
+    setMentionQuery(null);
+    setMentionInChannel([]);
+    setMentionOutChannel([]);
+    requestAnimationFrame(() => {
+      const newCursor = atIdx + user.username.length + 2;
+      ta.setSelectionRange(newCursor, newCursor);
+      ta.focus();
+    });
+  }
 
   function selectSlashCommand(cmd: SlashCommandSuggestion) {
     const prefix = cmd.Complete.startsWith("/") ? cmd.Complete : "/" + cmd.Complete;
@@ -374,8 +458,25 @@ export function MessageComposer({ channelId, serverId }: MessageComposerProps) {
     }
   }
 
+  const allMentionResults = [...mentionInChannel, ...mentionOutChannel];
+
+  useEffect(() => {
+    const container = mentionListRef.current;
+    if (!container || allMentionResults.length === 0) return;
+    const items = container.querySelectorAll<HTMLElement>(".mention-autocomplete-item");
+    items[mentionSelectedIdx]?.scrollIntoView({ block: "nearest" });
+  }, [mentionSelectedIdx, allMentionResults.length]);
+
   function handleKeyDown(e: React.KeyboardEvent) {
     if (handleMarkdownShortcut(e, textareaRef, text, setText)) return;
+    if (allMentionResults.length > 0) {
+      if (e.key === "ArrowDown") { e.preventDefault(); setMentionSelectedIdx((i) => Math.min(i + 1, allMentionResults.length - 1)); return; }
+      if (e.key === "ArrowUp") { e.preventDefault(); setMentionSelectedIdx((i) => Math.max(i - 1, 0)); return; }
+      if (e.key === "Tab" || e.key === "Enter") {
+        if (allMentionResults[mentionSelectedIdx]) { e.preventDefault(); insertMention(allMentionResults[mentionSelectedIdx]); return; }
+      }
+      if (e.key === "Escape") { e.preventDefault(); setMentionQuery(null); setMentionInChannel([]); setMentionOutChannel([]); return; }
+    }
     if (slashResults.length > 0) {
       if (e.key === "ArrowDown") { e.preventDefault(); setSlashSelectedIdx((i) => Math.min(i + 1, slashResults.length - 1)); return; }
       if (e.key === "ArrowUp") { e.preventDefault(); setSlashSelectedIdx((i) => Math.max(i - 1, 0)); return; }
@@ -435,6 +536,49 @@ export function MessageComposer({ channelId, serverId }: MessageComposerProps) {
               <span className="slash-autocomplete-desc">{cmd.Description}</span>
             </button>
           ))}
+        </div>
+      )}
+
+      {/* Mention autocomplete */}
+      {allMentionResults.length > 0 && (
+        <div className="mention-autocomplete" ref={mentionListRef}>
+          {mentionInChannel.length > 0 && (
+            <>
+              <div className="mention-autocomplete-header">Channel Members</div>
+              {mentionInChannel.map((user, i) => (
+                <button
+                  key={user.id}
+                  className={`mention-autocomplete-item ${i === mentionSelectedIdx ? "selected" : ""}`}
+                  onMouseDown={(e) => { e.preventDefault(); insertMention(user); }}
+                >
+                  <UserAvatar userId={user.id} username={user.username} size={24} />
+                  <span className="mention-autocomplete-username">@{user.username}</span>
+                  <span className="mention-autocomplete-name">{getDisplayName(user)}</span>
+                  {user.is_bot && <span className="mention-autocomplete-bot">BOT</span>}
+                </button>
+              ))}
+            </>
+          )}
+          {mentionOutChannel.length > 0 && (
+            <>
+              <div className="mention-autocomplete-header">Not in Channel</div>
+              {mentionOutChannel.map((user, i) => {
+                const globalIdx = mentionInChannel.length + i;
+                return (
+                  <button
+                    key={user.id}
+                    className={`mention-autocomplete-item ${globalIdx === mentionSelectedIdx ? "selected" : ""}`}
+                    onMouseDown={(e) => { e.preventDefault(); insertMention(user); }}
+                  >
+                    <UserAvatar userId={user.id} username={user.username} size={24} />
+                    <span className="mention-autocomplete-username">@{user.username}</span>
+                    <span className="mention-autocomplete-name">{getDisplayName(user)}</span>
+                    {user.is_bot && <span className="mention-autocomplete-bot">BOT</span>}
+                  </button>
+                );
+              })}
+            </>
+          )}
         </div>
       )}
 

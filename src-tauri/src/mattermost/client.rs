@@ -1697,6 +1697,52 @@ impl MattermostClient {
         Ok(users)
     }
 
+    /// Autocomplete users by term within a channel (returns in-channel first, then out-of-channel)
+    pub async fn autocomplete_users_in_channel(
+        &self,
+        team_id: &str,
+        channel_id: &str,
+        term: &str,
+    ) -> Result<(Vec<User>, Vec<User>), AppError> {
+        let auth = self.auth_header()?;
+        let url = format!("{}api/v4/users/autocomplete", self.base_url);
+        let resp = self
+            .http_slow
+            .get(&url)
+            .header(header::AUTHORIZATION, &auth)
+            .query(&[
+                ("in_team", team_id),
+                ("in_channel", channel_id),
+                ("name", term),
+                ("limit", "20"),
+            ])
+            .send()
+            .await?;
+        if !resp.status().is_success() {
+            let status = resp.status().as_u16();
+            let msg = resp.text().await.unwrap_or_default();
+            return Err(AppError::Api { status, message: msg });
+        }
+        let val: serde_json::Value = resp.json().await?;
+        let in_channel = val["users"]
+            .as_array()
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| serde_json::from_value::<User>(v.clone()).ok())
+                    .collect()
+            })
+            .unwrap_or_default();
+        let out_of_channel = val["out_of_channel"]
+            .as_array()
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| serde_json::from_value::<User>(v.clone()).ok())
+                    .collect()
+            })
+            .unwrap_or_default();
+        Ok((in_channel, out_of_channel))
+    }
+
     /// Get WebSocket URL for this server
     pub fn websocket_url(&self) -> Result<String, AppError> {
         let base = self.base_url.as_str();

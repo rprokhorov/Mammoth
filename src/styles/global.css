@@ -3884,6 +3884,80 @@ select:focus-visible {
   text-align: right;
 }
 
+/* ===== Mention Autocomplete ===== */
+.mention-autocomplete {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  right: 0;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 4px;
+  max-height: 320px;
+  overflow-y: auto;
+  z-index: 100;
+  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.mention-autocomplete-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 14px;
+  text-align: left;
+}
+
+.mention-autocomplete-item:hover,
+.mention-autocomplete-item.selected {
+  background: var(--bg-tertiary);
+}
+
+.mention-autocomplete-username {
+  font-weight: 600;
+  color: var(--text-primary);
+  min-width: 100px;
+}
+
+.mention-autocomplete-name {
+  color: var(--text-secondary);
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mention-autocomplete-header {
+  padding: 6px 12px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary);
+  border-top: 1px solid var(--border);
+}
+
+.mention-autocomplete-header:first-child {
+  border-top: none;
+}
+
+.mention-autocomplete-bot {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  flex-shrink: 0;
+  letter-spacing: 0.5px;
+}
+
 /* ===== Emoji Autocomplete ===== */
 .emoji-autocomplete {
   position: absolute;

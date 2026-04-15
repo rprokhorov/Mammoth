@@ -25,6 +25,8 @@ pub struct User {
     pub update_at: i64,
     #[serde(default)]
     pub delete_at: i64,
+    #[serde(default)]
+    pub is_bot: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

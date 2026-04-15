@@ -40,6 +40,33 @@ pub async fn autocomplete_users(
 }
 
 #[derive(Debug, Clone, Serialize)]
+pub struct MentionAutocompleteResult {
+    pub in_channel: Vec<User>,
+    pub out_of_channel: Vec<User>,
+}
+
+#[tauri::command]
+pub async fn autocomplete_users_in_channel(
+    state: State<'_, AppState>,
+    server_id: String,
+    team_id: String,
+    channel_id: String,
+    term: String,
+) -> Result<MentionAutocompleteResult, AppError> {
+    let client = {
+        let servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let server = servers
+            .get(&server_id)
+            .ok_or_else(|| AppError::NotFound(format!("Server {} not found", server_id)))?;
+        server.client.clone()
+    };
+    let (in_channel, out_of_channel) = client
+        .autocomplete_users_in_channel(&team_id, &channel_id, &term)
+        .await?;
+    Ok(MentionAutocompleteResult { in_channel, out_of_channel })
+}
+
+#[derive(Debug, Clone, Serialize)]
 pub struct ChannelWithMeta {
     #[serde(flatten)]
     pub channel: Channel,
