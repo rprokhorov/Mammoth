@@ -532,35 +532,38 @@ export function ChannelList({ onSelectChannel, onCreateChannel, serverId, curren
         setCategoryMenu(null);
       }}
     >
-      <button
-        className="channel-item find-nav-btn"
-        onClick={() => setShowQuickSwitcher(true)}
-        title="Find channels or people (⌘K)"
-      >
-        <span className="channel-prefix">🔍</span>
-        <span className="channel-name">Find channel or user</span>
-        <span className="quick-switcher-shortcut">⌘K</span>
-      </button>
-      <button
-        className={`channel-item threads-nav-btn ${mainSubView === "threads" ? "active" : ""}`}
-        onClick={handleThreadsClick}
-      >
-        <span className="channel-prefix">&#x1F4AC;</span>
-        <span className="channel-name">Threads</span>
-        {userThreadsUnread > 0 && (
-          <span className="mention-badge">{userThreadsUnread}</span>
-        )}
-      </button>
-      <button
-        className={`channel-item threads-nav-btn ${mainSubView === "reactions" ? "active" : ""}`}
-        onClick={handleReactionsClick}
-      >
-        <span className="channel-prefix">&#x1F44D;</span>
-        <span className="channel-name">Reactions</span>
-        {reactionsUnread > 0 && (
-          <span className="mention-badge">{reactionsUnread}</span>
-        )}
-      </button>
+      <div className="channel-list-header">
+        <button
+          className="channel-item find-nav-btn"
+          onClick={() => setShowQuickSwitcher(true)}
+          title="Find channels or people (⌘K)"
+        >
+          <span className="channel-prefix">🔍</span>
+          <span className="channel-name">Find channel or user</span>
+          <span className="quick-switcher-shortcut">⌘K</span>
+        </button>
+        <button
+          className={`channel-item threads-nav-btn ${mainSubView === "threads" ? "active" : ""}`}
+          onClick={handleThreadsClick}
+        >
+          <span className="channel-prefix">&#x1F4AC;</span>
+          <span className="channel-name">Threads</span>
+          {userThreadsUnread > 0 && (
+            <span className="mention-badge">{userThreadsUnread}</span>
+          )}
+        </button>
+        <button
+          className={`channel-item threads-nav-btn ${mainSubView === "reactions" ? "active" : ""}`}
+          onClick={handleReactionsClick}
+        >
+          <span className="channel-prefix">&#x1F44D;</span>
+          <span className="channel-name">Reactions</span>
+          {reactionsUnread > 0 && (
+            <span className="mention-badge">{reactionsUnread}</span>
+          )}
+        </button>
+      </div>
+      <div className="channel-list-scroll">
       {onCreateChannel && (
         <button
           className="channel-item create-channel-btn"
@@ -848,6 +851,8 @@ export function ChannelList({ onSelectChannel, onCreateChannel, serverId, curren
           </div>
         </>
       )}
+
+      </div>
 
       {showQuickSwitcher && serverId && teamId && (
         <QuickSwitcher

@@ -362,8 +362,10 @@ button.secondary:hover:not(:disabled) {
 .channel-sidebar {
   width: 240px;
   background: var(--bg-secondary);
-  overflow-y: auto;
+  overflow-y: hidden;
   flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .resize-handle {
@@ -771,7 +773,22 @@ button.secondary:hover:not(:disabled) {
 
 /* Channel List */
 .channel-list {
-  padding: 8px 0;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.channel-list-header {
+  flex-shrink: 0;
+  padding: 8px 0 4px;
+  border-bottom: 1px solid var(--border);
+}
+
+.channel-list-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 0;
 }
 
 .channel-group {
@@ -2228,8 +2245,7 @@ pre.code-block.mermaid-code {
 }
 
 .threads-nav-btn {
-  margin-bottom: 4px;
-  border-bottom: 1px solid var(--border);
+  margin-bottom: 0;
 }
 
 /* Search */

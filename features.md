@@ -203,6 +203,7 @@ Implemented in one pass:
 | 84 | Хоткей Quick Switcher изменён с Cmd+P на Cmd+K; обновлены: обработчик клавиш в ChannelList, tooltip и ярлык на кнопке Find, раздел Keyboard Shortcuts в ShortcutsModal | Готово | 1 |
 | 85 | Slash-команды выполняются корректно через POST /commands/execute: исправлена передача team_id (обязательный параметр API) в тело запроса; исправлено несоответствие параметров Tauri handler (добавлен team_id: Option<String>), без которого invoke завершался ошибкой и сообщение не отправлялось | Готово | 2 |
 | 86 | Кнопка поиска в боковой панели: текст изменён с "Find" на "Find channel or user" | Готово | 1 |
+| 87 | Find, Threads, Reactions зафиксированы вверху боковой панели и не прокручиваются вместе со списком каналов: header вынесен в отдельный div с flex-shrink:0, список каналов обёрнут в scrollable div | Готово | 1 |
 
 ---
 
