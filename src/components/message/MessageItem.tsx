@@ -211,7 +211,7 @@ export const MessageItem = memo(function MessageItem({
           className="message-body"
           onMouseDown={!post.root_id ? (e) => { if (e.button === 1) { e.preventDefault(); handleOpenThread(); } } : undefined}
         >
-          <CustomEmojiRenderer text={post.message} />
+          <CustomEmojiRenderer text={post.message} serverId={serverId} />
           {isEdited && <span className="message-edited">(edited)</span>}
         </div>
 

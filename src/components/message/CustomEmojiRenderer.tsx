@@ -9,6 +9,7 @@ import { MarkdownRenderer } from "./MarkdownRenderer";
 
 interface Props {
   text: string;
+  serverId?: string;
 }
 
 // Inline image for a single custom emoji — loads lazily via hook
@@ -25,7 +26,7 @@ const CustomEmojiImg = memo(function CustomEmojiImg({ id, name }: { id: string; 
   );
 });
 
-export const CustomEmojiRenderer = memo(function CustomEmojiRenderer({ text }: Props) {
+export const CustomEmojiRenderer = memo(function CustomEmojiRenderer({ text, serverId }: Props) {
   const emojis = useCustomEmojiStore((s) => s.emojis);
 
   // Build a name→id map for quick lookup
@@ -42,7 +43,7 @@ export const CustomEmojiRenderer = memo(function CustomEmojiRenderer({ text }: P
   }, [text, emojiMap]);
 
   if (!hasCustom) {
-    return <MarkdownRenderer text={text} />;
+    return <MarkdownRenderer text={text} serverId={serverId} />;
   }
 
   // Split by :name: tokens, render custom ones as <img>, rest as markdown
@@ -61,7 +62,7 @@ export const CustomEmojiRenderer = memo(function CustomEmojiRenderer({ text }: P
 
     // Text before this emoji
     if (match.index > lastIndex) {
-      parts.push(<MarkdownRenderer key={key++} text={text.slice(lastIndex, match.index)} />);
+      parts.push(<MarkdownRenderer key={key++} text={text.slice(lastIndex, match.index)} serverId={serverId} />);
     }
     parts.push(<CustomEmojiImg key={key++} id={id} name={name} />);
     lastIndex = match.index + match[0].length;
@@ -69,7 +70,7 @@ export const CustomEmojiRenderer = memo(function CustomEmojiRenderer({ text }: P
 
   // Remaining text after last emoji
   if (lastIndex < text.length) {
-    parts.push(<MarkdownRenderer key={key++} text={text.slice(lastIndex)} />);
+    parts.push(<MarkdownRenderer key={key++} text={text.slice(lastIndex)} serverId={serverId} />);
   }
 
   return <>{parts}</>;

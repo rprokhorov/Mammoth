@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useUiStore } from "@/stores/uiStore";
 import { useTabsStore } from "@/stores/tabsStore";
@@ -271,28 +271,28 @@ export function UserPopover({
     }
   }
 
+  // Compute position once when popover first mounts — never recompute on data updates.
+  const popoverStyle = useMemo<React.CSSProperties>(() => {
+    if (!anchorEl) return {};
+    const rect = anchorEl.getBoundingClientRect();
+    const vh = window.innerHeight;
+    const vw = window.innerWidth;
+    const POP_W = 280;
+    const gap = 4;
+    const openUpward = rect.bottom > vh / 2;
+    return {
+      position: "fixed",
+      zIndex: 1000,
+      width: POP_W,
+      ...(openUpward
+        ? { bottom: vh - rect.top + gap }
+        : { top: rect.bottom + gap }),
+      left: Math.min(Math.max(rect.left, 8), vw - POP_W - 8),
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [anchorEl]);
+
   if (!anchorEl) return null;
-
-  // Decide direction synchronously based on anchor position relative to viewport.
-  // We don't know the exact card height, but we DO know which half of the screen
-  // the anchor is in — open upward if in bottom half, downward if in top half.
-  // max-height in CSS ensures the card never overflows regardless of content size.
-  const rect = anchorEl.getBoundingClientRect();
-  const vh = window.innerHeight;
-  const vw = window.innerWidth;
-  const POP_W = 280;
-  const gap = 4;
-  const openUpward = rect.bottom > vh / 2;
-
-  const popoverStyle: React.CSSProperties = {
-    position: "fixed",
-    zIndex: 1000,
-    width: POP_W,
-    ...(openUpward
-      ? { bottom: vh - rect.top + gap }
-      : { top: rect.bottom + gap }),
-    left: Math.min(Math.max(rect.left, 8), vw - POP_W - 8),
-  };
 
   const fullName = [profile?.first_name, profile?.last_name]
     .filter(Boolean)
