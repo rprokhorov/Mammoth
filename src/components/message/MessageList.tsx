@@ -116,12 +116,26 @@ export function MessageList({
     // Use the unread endpoint — it returns a chunk centered on the unread
     // marker, so the first unread message is guaranteed to be in the chunk
     // if one exists.
-    const loadPromise = invoke<UnreadPostsResponse>("get_posts_around_last_unread", {
-      serverId,
-      channelId,
-      limitBefore: 30,
-      limitAfter: 60,
+    // Retry once on transient connection errors (e.g. connection reset on first
+    // request after app startup before the HTTP connection pool is warmed up).
+    const fetchPosts = () =>
+      invoke<UnreadPostsResponse>("get_posts_around_last_unread", {
+        serverId,
+        channelId,
+        limitBefore: 30,
+        limitAfter: 60,
+      });
+    const loadPromise = fetchPosts().catch((e) => {
+      if (cancelled) return Promise.reject(e);
+      const msg = String(e).toLowerCase();
+      if (msg.includes("connect") || msg.includes("network") || msg.includes("timed out") || msg.includes("reset") || msg.includes("eof")) {
+        return new Promise<UnreadPostsResponse>((resolve, reject) =>
+          setTimeout(() => { if (!cancelled) fetchPosts().then(resolve, reject); else reject(e); }, 1500),
+        );
+      }
+      return Promise.reject(e);
     }).then((res) => {
+      if (!res) return;
       if (cancelled) return;
       setChannelPosts(channelId, res.order, res.posts);
       // prev_post_id === '' means we're at the oldest post in the channel.
