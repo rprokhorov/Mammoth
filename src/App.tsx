@@ -154,6 +154,43 @@ function AppContent() {
     loadServers();
   }, []);
 
+  // Phase 2: listen for channels-loaded event pushed from Rust background task
+  useEffect(() => {
+    type ChannelsPayload = {
+      server_id: string;
+      team_id: string;
+      channels: Array<{
+        id: string; team_id: string; display_name: string; name: string;
+        channel_type: string; header: string; purpose: string;
+        last_post_at: number; total_msg_count: number;
+        msg_count: number; mention_count: number; last_viewed_at: number;
+      }>;
+      sidebar_categories: import("@/stores/uiStore").SidebarCategory[];
+      favorite_channel_ids: string[];
+      dm_users: Array<{ id: string; username: string; first_name: string; last_name: string; nickname: string; email: string }>;
+    };
+    const unlisten = listen<ChannelsPayload>("channels-loaded", (event) => {
+      const { channels, sidebar_categories, favorite_channel_ids, dm_users } = event.payload;
+      const store = useUiStore.getState();
+      store.setChannels(channels);
+      store.setUsers(dm_users);
+      store.setFavoriteChannels(favorite_channel_ids);
+      if (sidebar_categories.length > 0) {
+        store.setSidebarCategories(sidebar_categories);
+      }
+      // Select first public channel if none is selected yet
+      if (!store.activeChannelId) {
+        const firstPublic = channels.find((ch) => ch.channel_type === "O");
+        if (firstPublic) {
+          store.setActiveChannelId(firstPublic.id);
+          useTabsStore.getState().navigateDefaultTab(firstPublic.id);
+        }
+      }
+    });
+    return () => { unlisten.then((fn) => fn()); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Navigate to channel when notification is clicked (emitted from Rust delegate)
   useEffect(() => {
     const unlisten = listen<string>("notif:navigate-channel", (event) => {
@@ -289,7 +326,10 @@ function AppContent() {
   async function loadServers() {
     const store = useUiStore.getState();
     try {
-      const serverList = await invoke<ServerInfo[]>("list_servers");
+      const [serverList, activeId] = await Promise.all([
+        invoke<ServerInfo[]>("list_servers"),
+        invoke<string | null>("get_active_server"),
+      ]);
       const mapped = serverList.map((s) => ({
         id: s.id,
         displayName: s.display_name,
@@ -304,68 +344,97 @@ function AppContent() {
         return;
       }
 
-      const activeId = await invoke<string | null>("get_active_server");
       const targetId = activeId && mapped.some((s) => s.id === activeId)
         ? activeId
         : mapped[0].id;
       store.setActiveServerId(targetId);
 
-      // Try to validate saved session
+      // Phase 1: fast — me + teams + cached channels from last session
+      type FastResult = {
+        user: { id: string; username: string };
+        teams: Array<{ id: string; display_name: string; name: string }>;
+        cached_channels: Array<{
+          id: string; team_id: string; display_name: string; name: string;
+          channel_type: string; header: string; purpose: string;
+          last_post_at: number; total_msg_count: number;
+          msg_count: number; mention_count: number; last_viewed_at: number;
+        }>;
+        cached_sidebar_categories: import("@/stores/uiStore").SidebarCategory[];
+        cached_favorite_channel_ids: string[];
+        cached_dm_users: Array<{ id: string; username: string; first_name: string; last_name: string; nickname: string; email: string }>;
+        has_cache: boolean;
+      };
+      let fastResult: FastResult | null;
       try {
-        let valid: boolean;
-        try {
-          valid = await invoke<boolean>("validate_session", { serverId: targetId });
-        } catch (e) {
-          const msg = String(e).toLowerCase();
-          const isNetwork = msg.includes("network") || msg.includes("connection") || msg.includes("timeout") || msg.includes("connect");
-          if (isNetwork) {
-            // Server unreachable — keep token, go to main with offline indicator
-            console.warn("Server unreachable at startup, proceeding offline:", e);
-            store.setCurrentView("main");
-            return;
-          }
-          throw e;
-        }
-        if (!valid) {
-          store.setCurrentView("login");
-          return;
-        }
-
-        // Session is valid — load user, connect WS, load data
-        const me = await invoke<{ id: string; username: string }>("get_me", { serverId: targetId });
-        setCurrentUserId(me.id);
-        store.setCurrentUserId(me.id);
-        store.setServers(mapped.map((s) =>
-          s.id === targetId ? { ...s, connected: true, username: me.username } : s,
-        ));
-
-        // Connect WebSocket (fire and forget)
-        invoke("connect_ws", { serverId: targetId }).catch((e: unknown) =>
-          console.error("WS connect failed:", e),
-        );
-
-        // Load teams & channels
-        await loadTeams(targetId);
-        // Load user threads so unread badge works immediately
-        const teamIdAfterLoad = useUiStore.getState().activeTeamId;
-        if (teamIdAfterLoad) {
-          loadUserThreads(targetId, teamIdAfterLoad).catch(() => {});
-        }
-        // Load custom emojis in background
-        loadCustomEmojis(targetId).catch(() => {});
-        store.setCurrentView("main");
+        fastResult = await invoke("init_app_fast", { serverId: targetId });
       } catch (e) {
-        console.error("Session restore failed:", e);
         const msg = String(e).toLowerCase();
         const isNetwork = msg.includes("network") || msg.includes("connection") || msg.includes("timeout") || msg.includes("connect") || msg.includes("os error");
         if (isNetwork) {
-          console.warn("Network error during session restore, proceeding offline");
+          console.warn("Server unreachable at startup, proceeding offline:", e);
           store.setCurrentView("main");
-        } else {
-          setInitError(String(e));
-          store.setCurrentView("login");
+          return;
+        }
+        throw e;
+      }
+
+      if (!fastResult) {
+        store.setCurrentView("login");
+        return;
+      }
+
+      const {
+        user, teams,
+        cached_channels, cached_sidebar_categories,
+        cached_favorite_channel_ids, cached_dm_users, has_cache,
+      } = fastResult;
+
+      setCurrentUserId(user.id);
+      store.setCurrentUserId(user.id);
+      store.setServers(mapped.map((s) =>
+        s.id === targetId ? { ...s, connected: true, username: user.username } : s,
+      ));
+      store.setTeams(teams);
+      if (teams.length > 0) {
+        store.setActiveTeamId(teams[0].id);
+      }
+
+      // If we have cached channel data — apply it immediately so the user
+      // sees a populated sidebar before the server refresh completes.
+      if (has_cache && cached_channels.length > 0) {
+        store.setChannels(cached_channels);
+        store.setUsers(cached_dm_users);
+        store.setFavoriteChannels(cached_favorite_channel_ids);
+        if (cached_sidebar_categories.length > 0) {
+          store.setSidebarCategories(cached_sidebar_categories);
+        }
+        const firstPublic = cached_channels.find((ch) => ch.channel_type === "O");
+        if (firstPublic) {
+          store.setActiveChannelId(firstPublic.id);
+          useTabsStore.getState().navigateDefaultTab(firstPublic.id);
         }
       }
+
+      // Show UI immediately (with or without cached channels)
+      store.setCurrentView("main");
+
+      // Connect WebSocket (fire and forget)
+      invoke("connect_ws", { serverId: targetId }).catch((e: unknown) =>
+        console.error("WS connect failed:", e),
+      );
+
+      // Phase 2: refresh channels from server in background
+      // Result comes via "channels-loaded" Tauri event — updates store when ready
+      const teamId = teams[0]?.id;
+      if (teamId) {
+        invoke("load_channels_data", { serverId: targetId, teamId }).catch((e: unknown) =>
+          console.error("load_channels_data failed:", e),
+        );
+        loadUserThreads(targetId, teamId).catch(() => {});
+      }
+
+      // Emojis always in background
+      loadCustomEmojis(targetId).catch(() => {});
     } catch (e) {
       console.error("Failed to load servers:", e);
       setInitError(String(e));

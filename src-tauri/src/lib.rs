@@ -145,6 +145,9 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            // Fast startup
+            commands::init_app_fast,
+            commands::load_channels_data,
             // Auth
             commands::ping_server,
             commands::login,

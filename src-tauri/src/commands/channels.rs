@@ -66,7 +66,7 @@ pub async fn autocomplete_users_in_channel(
     Ok(MentionAutocompleteResult { in_channel, out_of_channel })
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, serde::Deserialize)]
 pub struct ChannelWithMeta {
     #[serde(flatten)]
     pub channel: Channel,
