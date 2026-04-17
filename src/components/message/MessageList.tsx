@@ -21,6 +21,12 @@ interface UnreadPostsResponse {
   next_post_id: string;
 }
 
+interface PostsDiskCache {
+  saved_at: number;
+  order: string[];
+  posts: Record<string, PostData>;
+}
+
 interface MessageListProps {
   channelId: string;
   serverId: string;
@@ -73,6 +79,28 @@ function getMessagesActions() {
   };
 }
 
+/** Fetch and cache user info for unknown user IDs (fire-and-forget). */
+function prefetchUsers(userIds: string[], serverId: string) {
+  if (userIds.length === 0) return;
+  const users = useUiStore.getState().users;
+  const unknown = userIds.filter((id) => !users[id]);
+  if (unknown.length === 0) return;
+  invoke("get_users_by_ids", { serverId, userIds: unknown })
+    .then((result) => {
+      useUiStore.getState().setUsers(
+        result as Array<{
+          id: string;
+          username: string;
+          first_name: string;
+          last_name: string;
+          nickname: string;
+          email: string;
+        }>,
+      );
+    })
+    .catch(console.error);
+}
+
 export function MessageList({
   channelId,
   serverId,
@@ -94,44 +122,35 @@ export function MessageList({
   const posts = useMessagesStore((s) => s.posts);
   const loading = useMessagesStore((s) => s.loading);
 
-  // Load initial posts
+  // Load initial posts — stale-while-revalidate strategy:
+  // 1. If memory cache exists → show immediately, fetch silently in background
+  // 2. If no memory cache → try disk cache, show it, then fetch silently
+  // 3. If no disk cache → show spinner, fetch, then display
   useEffect(() => {
     let cancelled = false;
     const { setLoading, setChannelPosts } = getMessagesActions();
-    // Only show spinner if we have no cached posts for this channel yet.
-    const hasCached = (useMessagesStore.getState().orderByChannel[channelId]?.length ?? 0) > 0;
-    if (!hasCached) setLoading(true);
+
+    const hasCachedInMemory = (useMessagesStore.getState().orderByChannel[channelId]?.length ?? 0) > 0;
+
+    // Show spinner only if truly no data available
+    if (!hasCachedInMemory) setLoading(true);
+
     setHasMore(true);
     setLoadError(null);
-
-    // Reset unread banner and scroll state for this channel open.
     setUnreadInfo(null);
     userScrolled.current = false;
 
-    // Snapshot last_viewed_at from the client store (populated once at app
-    // startup by loadChannels and never overwritten by view_channel). Mirrors
-    // Mattermost webapp's frozen `views.channel.lastChannelViewTime` map.
     const channelInfo = useUiStore.getState().channels.find((c) => c.id === channelId);
     if (channelInfo) {
       primeLastViewedSnapshot(channelId, channelInfo.last_viewed_at);
     }
     const lastViewedAt = getLastViewedSnapshot(channelId);
 
-    // Decide which endpoint to use:
-    // - If channel has unread posts (total_msg_count > msg_count), use the
-    //   unread endpoint so the chunk is centered on the first unread post.
-    // - Otherwise use get_posts page=0 which always returns the latest posts.
-    //   The unread endpoint anchors on last_viewed_at and may miss very recent
-    //   posts when the channel is already fully read.
-    // Use unread endpoint only when last_viewed_at is strictly before last_post_at —
-    // meaning there are posts the user hasn't seen yet. In all other cases (channel
-    // fully read, msg_count=0/stale, or unknown) fetch the latest posts directly via
-    // get_posts page=0, which always returns the most recent messages.
     const hasUnread = channelInfo
       ? channelInfo.last_viewed_at > 0 && channelInfo.last_post_at > channelInfo.last_viewed_at
       : false;
 
-    const fetchPosts = (): Promise<UnreadPostsResponse> => {
+    const fetchFromNetwork = (): Promise<UnreadPostsResponse> => {
       if (hasUnread) {
         return invoke<UnreadPostsResponse>("get_posts_around_last_unread", {
           serverId,
@@ -140,7 +159,6 @@ export function MessageList({
           limitAfter: 60,
         });
       }
-      // Fully read or unknown — fetch latest posts directly
       return invoke<PostsResponse>("get_posts", {
         serverId,
         channelId,
@@ -154,27 +172,14 @@ export function MessageList({
       }));
     };
 
-    const loadPromise = fetchPosts().catch((e) => {
-      if (cancelled) return Promise.reject(e);
-      const msg = String(e).toLowerCase();
-      if (msg.includes("connect") || msg.includes("network") || msg.includes("timed out") || msg.includes("reset") || msg.includes("eof")) {
-        return new Promise<UnreadPostsResponse>((resolve, reject) =>
-          setTimeout(() => { if (!cancelled) fetchPosts().then(resolve, reject); else reject(e); }, 1500),
-        );
-      }
-      return Promise.reject(e);
-    }).then((res) => {
+    const applyPosts = (res: UnreadPostsResponse, scrollToBottom: boolean) => {
       if (!res) return;
-      // Always write posts to store even if component unmounted — safe since
-      // store is global. UI-only state (scroll, unread banner) is skipped if cancelled.
       setChannelPosts(channelId, res.order, res.posts);
       if (cancelled) return;
 
-      // prev_post_id === '' means we're at the oldest post in the channel.
       if (res.prev_post_id === "") setHasMore(false);
 
-      // Compute unread info: first unread post + count of unread posts.
-      // Walk chronologically (oldest → newest).
+      // Compute unread banner
       let firstUnreadId: string | null = null;
       let unreadCount = 0;
       if (lastViewedAt > 0) {
@@ -182,7 +187,6 @@ export function MessageList({
         for (const pid of displayOrder) {
           const p = res.posts[pid];
           if (!p || p.delete_at > 0 || p.root_id) continue;
-          // Skip system messages (joined/left/header changes/etc).
           if (p.post_type && p.post_type.startsWith("system_")) continue;
           if (p.create_at > lastViewedAt) {
             if (!firstUnreadId) firstUnreadId = pid;
@@ -190,46 +194,117 @@ export function MessageList({
           }
         }
       }
-
       if (firstUnreadId && unreadCount > 0) {
         setUnreadInfo({ firstUnreadId, count: unreadCount });
       }
 
-      // Background: load thread participants for root posts with replies.
+      // C: Prefetch users in parallel (fire-and-forget)
+      prefetchUsers(
+        Object.values(res.posts).map((p) => p.user_id),
+        serverId,
+      );
+
+      // Background: load thread participants
       fetchThreadParticipants(
         Object.values(res.posts).filter((p) => !p.root_id && (p.reply_count ?? 0) > 0).map((p) => p.id),
         serverId,
       );
 
-      // Always scroll to the bottom (latest message) on channel open.
-      // Pin to bottom indefinitely until the user manually scrolls up.
-      requestAnimationFrame(() => {
-        if (cancelled) return;
-        shouldPinToBottom.current = true;
-        userScrolled.current = false;
-        bottomRef.current?.scrollIntoView();
-      });
+      if (scrollToBottom) {
+        requestAnimationFrame(() => {
+          if (cancelled) return;
+          shouldPinToBottom.current = true;
+          userScrolled.current = false;
+          bottomRef.current?.scrollIntoView();
+        });
+      }
+    };
 
-      // Mark channel as viewed on server AFTER posts are loaded. The
-      // last_viewed_at snapshot is frozen, so this won't affect the
-      // unread banner.
-      invoke("view_channel", { serverId, channelId }).catch(console.error);
-    });
-
-    loadPromise
-      .catch((e) => {
-        if (cancelled) return;
-        console.error("Failed to load posts:", e);
-        const msg = String(e).toLowerCase();
-        if (msg.includes("timed out") || msg.includes("network") || msg.includes("connect")) {
-          setLoadError("Не удалось загрузить сообщения — нет соединения с сервером");
-        } else {
-          setLoadError("Не удалось загрузить сообщения");
+    const runLoad = async () => {
+      // Step 1: try disk cache if no memory cache
+      if (!hasCachedInMemory) {
+        try {
+          const diskCache = await invoke<PostsDiskCache | null>("load_posts_cache", {
+            serverId,
+            channelId,
+          });
+          if (diskCache && diskCache.order.length > 0 && !cancelled) {
+            // Show disk cache immediately — this removes the spinner
+            setChannelPosts(channelId, diskCache.order, diskCache.posts);
+            setLoading(false);
+            // Prefetch users from disk cache right away
+            prefetchUsers(
+              Object.values(diskCache.posts).map((p) => p.user_id),
+              serverId,
+            );
+            // Scroll to bottom with disk-cached data
+            requestAnimationFrame(() => {
+              if (cancelled) return;
+              shouldPinToBottom.current = true;
+              userScrolled.current = false;
+              bottomRef.current?.scrollIntoView();
+            });
+          }
+        } catch (_) {
+          // disk cache miss — no problem, network fetch follows
         }
-      })
-      .finally(() => {
+      }
+
+      // Step 2: always fetch from network (silently if we already have data)
+      const withRetry = () =>
+        fetchFromNetwork().catch((e) => {
+          if (cancelled) return Promise.reject(e);
+          const msg = String(e).toLowerCase();
+          if (msg.includes("connect") || msg.includes("network") || msg.includes("timed out") || msg.includes("reset") || msg.includes("eof")) {
+            return new Promise<UnreadPostsResponse>((resolve, reject) =>
+              setTimeout(() => { if (!cancelled) fetchFromNetwork().then(resolve, reject); else reject(e); }, 1500),
+            );
+          }
+          return Promise.reject(e);
+        });
+
+      try {
+        const res = await withRetry();
+        if (cancelled) return;
+        const hasDataAlready = (useMessagesStore.getState().orderByChannel[channelId]?.length ?? 0) > 0;
+        applyPosts(res, !hasDataAlready);
+        // If we had cached data and just silently updated, re-pin to bottom only if user hasn't scrolled
+        if (hasDataAlready && !userScrolled.current) {
+          requestAnimationFrame(() => {
+            if (!cancelled) {
+              shouldPinToBottom.current = true;
+              bottomRef.current?.scrollIntoView();
+            }
+          });
+        }
+        // D: Save fresh posts to disk cache (fire-and-forget)
+        invoke("save_posts_cache", {
+          serverId,
+          channelId,
+          order: res.order,
+          posts: res.posts,
+        }).catch(() => {});
+
+        // Mark channel as viewed on server AFTER posts loaded
+        invoke("view_channel", { serverId, channelId }).catch(console.error);
+      } catch (e) {
+        if (cancelled) return;
+        const hasFallbackData = (useMessagesStore.getState().orderByChannel[channelId]?.length ?? 0) > 0;
+        if (!hasFallbackData) {
+          console.error("Failed to load posts:", e);
+          const msg = String(e).toLowerCase();
+          if (msg.includes("timed out") || msg.includes("network") || msg.includes("connect")) {
+            setLoadError("Не удалось загрузить сообщения — нет соединения с сервером");
+          } else {
+            setLoadError("Не удалось загрузить сообщения");
+          }
+        }
+      } finally {
         if (!cancelled) setLoading(false);
-      });
+      }
+    };
+
+    runLoad();
 
     return () => {
       cancelled = true;
@@ -258,7 +333,8 @@ export function MessageList({
     return () => observer.disconnect();
   }, []);
 
-  // Load user info for unknown users in posts
+  // C: Load user info for any unknown users that appear in the post list
+  // (secondary pass — covers users not in posts.user_id like reaction authors etc.)
   useEffect(() => {
     const users = useUiStore.getState().users;
     const unknownIds = new Set<string>();
@@ -269,23 +345,7 @@ export function MessageList({
       }
     }
     if (unknownIds.size > 0) {
-      invoke("get_users_by_ids", {
-        serverId,
-        userIds: [...unknownIds],
-      })
-        .then((result) => {
-          useUiStore.getState().setUsers(
-            result as Array<{
-              id: string;
-              username: string;
-              first_name: string;
-              last_name: string;
-              nickname: string;
-              email: string;
-            }>,
-          );
-        })
-        .catch(console.error);
+      prefetchUsers([...unknownIds], serverId);
     }
   }, [order, serverId]);
 
@@ -332,6 +392,9 @@ export function MessageList({
 
       getMessagesActions().prependOlderPosts(channelId, res.order, res.posts);
       if (res.order.length < POSTS_PER_PAGE) setHasMore(false);
+
+      // C: prefetch users for older posts
+      prefetchUsers(Object.values(res.posts).map((p) => p.user_id), serverId);
 
       fetchThreadParticipants(
         Object.values(res.posts).filter((p) => !p.root_id && (p.reply_count ?? 0) > 0).map((p) => p.id),

@@ -2,11 +2,37 @@ import { useState, useRef, useEffect } from "react";
 import { startChannelDrag, endChannelDrag, createGhost, moveGhost, removeGhost, setDragOver } from "@/hooks/useChannelDrag";
 import { invoke } from "@tauri-apps/api/core";
 import { useUiStore, type ChannelInfo, type SidebarCategory } from "@/stores/uiStore";
+import { useMessagesStore, type PostData } from "@/stores/messagesStore";
 import { useThreadsStore } from "@/stores/threadsStore";
 import { useReactionsStore } from "@/stores/reactionsStore";
 import { useTabsStore } from "@/stores/tabsStore";
 import { UserAvatar } from "@/components/common/UserAvatar";
 import { QuickSwitcher } from "@/components/search/QuickSwitcher";
+
+// Tracks channels currently being prefetched to avoid duplicate requests
+const prefetchingChannels = new Set<string>();
+
+function prefetchChannelPosts(channelId: string, serverId: string) {
+  // Skip if already cached in memory, currently active, or already prefetching
+  const hasCached = (useMessagesStore.getState().orderByChannel[channelId]?.length ?? 0) > 0;
+  if (hasCached || prefetchingChannels.has(channelId)) return;
+  prefetchingChannels.add(channelId);
+  invoke<{ order: string[]; posts: Record<string, PostData> }>("get_posts", {
+    serverId,
+    channelId,
+    page: 0,
+    perPage: 60,
+  })
+    .then((res) => {
+      // Only store if still not cached (user may have opened channel while prefetching)
+      const stillEmpty = (useMessagesStore.getState().orderByChannel[channelId]?.length ?? 0) === 0;
+      if (stillEmpty) {
+        useMessagesStore.getState().setChannelPosts(channelId, res.order, res.posts);
+      }
+    })
+    .catch(() => {})
+    .finally(() => prefetchingChannels.delete(channelId));
+}
 
 interface ChannelListProps {
   onSelectChannel: (channelId: string) => void;
@@ -414,6 +440,11 @@ export function ChannelList({ onSelectChannel, onCreateChannel, serverId, curren
       <button
         key={ch.id}
         className={`channel-item ${activeChannelId === ch.id ? "active" : ""} ${isUnread(ch) ? "unread" : ""} ${dragChannelId === ch.id ? "dragging" : ""}`}
+        onMouseEnter={() => {
+          if (serverId && ch.id !== activeChannelId) {
+            prefetchChannelPosts(ch.id, serverId);
+          }
+        }}
         onMouseDown={(e) => {
           if (e.button !== 0) return;
           const channelId = ch.id;

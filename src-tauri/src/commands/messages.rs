@@ -1,9 +1,10 @@
 use serde::Serialize;
-use tauri::State;
+use tauri::{Manager, State};
 
 use crate::errors::AppError;
 use crate::mattermost::types::{Post, PostList, SlashCommand};
 use crate::state::AppState;
+use crate::storage::posts_cache::{self, ChannelPostsCache};
 
 #[derive(Debug, Clone, Serialize)]
 pub struct PostsResponse {
@@ -76,6 +77,39 @@ pub async fn get_posts(
         order: post_list.order,
         posts: post_list.posts,
     })
+}
+
+/// Load cached posts for a channel from disk (instant, no network).
+/// Returns None if no cache exists.
+#[tauri::command]
+pub async fn load_posts_cache(
+    app_handle: tauri::AppHandle,
+    server_id: String,
+    channel_id: String,
+) -> Option<ChannelPostsCache> {
+    let cache_dir = app_handle.path().app_cache_dir().ok()?;
+    posts_cache::load(&cache_dir, &server_id, &channel_id)
+}
+
+/// Save posts to disk cache for a channel.
+#[tauri::command]
+pub async fn save_posts_cache(
+    app_handle: tauri::AppHandle,
+    server_id: String,
+    channel_id: String,
+    order: Vec<String>,
+    posts: std::collections::HashMap<String, Post>,
+) -> Result<(), String> {
+    let cache_dir = app_handle
+        .path()
+        .app_cache_dir()
+        .map_err(|e: tauri::Error| e.to_string())?;
+    let saved_at = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as i64;
+    let cache = ChannelPostsCache { saved_at, order, posts };
+    posts_cache::save(&cache_dir, &server_id, &channel_id, &cache).map_err(|e| e.to_string())
 }
 
 #[tauri::command]

@@ -180,6 +180,8 @@ pub fn run() {
             // Messages
             commands::get_posts,
             commands::get_posts_around_last_unread,
+            commands::load_posts_cache,
+            commands::save_posts_cache,
             commands::send_post,
             commands::edit_post,
             commands::delete_post,
