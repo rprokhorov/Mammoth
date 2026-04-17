@@ -218,6 +218,7 @@ Implemented in one pass:
 | 99 | Быстрое переключение каналов (stale-while-revalidate для постов): если канал уже посещался, старые посты показываются мгновенно без спиннера, новые подгружаются тихо в фоне | Готово | 1 |
 | 100 | Исправлен выбор endpoint при открытии канала: вместо get_posts_around_last_unread (который при last_viewed_at==last_post_at возвращал только 30 старых постов и пропускал новые) теперь используется get_posts page=0 когда канал прочитан (last_post_at <= last_viewed_at); get_posts_around_last_unread используется только при реальных непрочитанных | Готово | 3 |
 | 101 | Интерактивные/bot-сообщения (post_type != "" но не "system_*") отображались как пустой system-message вместо полноценного сообщения с attachments; исправлено: isSystem теперь true только для post_type начинающегося с "system_" | Готово | 1 |
+| 102 | Системные сообщения "username joined/left the channel" скрыты: посты с типами system_join_channel, system_leave_channel, system_add_to_channel, system_remove_from_channel возвращают null в MessageItem | Готово | 1 |
 
 ---
 

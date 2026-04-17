@@ -86,6 +86,10 @@ export const MessageItem = memo(function MessageItem({
   })();
   const reactions = post.metadata?.reactions || [];
 
+  if (post.post_type === "system_join_channel" || post.post_type === "system_leave_channel" || post.post_type === "system_add_to_channel" || post.post_type === "system_remove_from_channel") {
+    return null;
+  }
+
   if (isSystem) {
     return (
       <div className="message-item system-message" data-post-id={post.id}>
