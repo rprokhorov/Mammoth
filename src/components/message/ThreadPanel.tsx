@@ -116,6 +116,21 @@ export function ThreadPanel({ serverId, currentUserId, width }: ThreadPanelProps
         );
 
         setThreadData(activeThreadId, displayOrder, postsWithReactions);
+
+        // Prefetch user info for all post authors not yet in cache
+        const uniqueUserIds = [...new Set(Object.values(res.posts).map((p) => p.user_id))];
+        const cachedUsers = useUiStore.getState().users;
+        const missingUserIds = uniqueUserIds.filter((id) => !cachedUsers[id]);
+        if (missingUserIds.length > 0) {
+          invoke("get_users_by_ids", { serverId, userIds: missingUserIds })
+            .then((result) => {
+              useUiStore.getState().setUsers(
+                result as Array<{ id: string; username: string; first_name: string; last_name: string; nickname: string; email: string }>,
+              );
+            })
+            .catch(() => {/* non-critical */});
+        }
+
         requestAnimationFrame(() => {
           bottomRef.current?.scrollIntoView();
         });
