@@ -108,7 +108,12 @@ export function ChannelInfoPanel({
       })
         .then(async (raw) => {
           const list = raw as ChannelMember[];
-          setMembers(list);
+          const sorted = [...list].sort((a, b) => {
+            const aAdmin = a.roles.includes("channel_admin") ? 0 : 1;
+            const bAdmin = b.roles.includes("channel_admin") ? 0 : 1;
+            return aAdmin - bAdmin;
+          });
+          setMembers(sorted);
           const ids = list.map((m) => m.user_id);
           if (ids.length > 0) {
             const users = await invoke<UserInfo[]>("get_users_by_ids", {
