@@ -219,6 +219,7 @@ Implemented in one pass:
 | 100 | Исправлен выбор endpoint при открытии канала: вместо get_posts_around_last_unread (который при last_viewed_at==last_post_at возвращал только 30 старых постов и пропускал новые) теперь используется get_posts page=0 когда канал прочитан (last_post_at <= last_viewed_at); get_posts_around_last_unread используется только при реальных непрочитанных | Готово | 3 |
 | 101 | Интерактивные/bot-сообщения (post_type != "" но не "system_*") отображались как пустой system-message вместо полноценного сообщения с attachments; исправлено: isSystem теперь true только для post_type начинающегося с "system_" | Готово | 1 |
 | 102 | Системные сообщения "username joined/left the channel" скрыты: посты с типами system_join_channel, system_leave_channel, system_add_to_channel, system_remove_from_channel возвращают null в MessageItem | Готово | 1 |
+| 103 | Мгновенное открытие каналов: (A) stale-while-revalidate — кэш из памяти или диска показывается сразу без спиннера, сеть обновляет тихо в фоне; (B) prefetch при hover — get_posts запускается при наведении мыши на канал; (C) параллельный fetch пользователей — get_users_by_ids идёт параллельно с загрузкой постов; (D) дисковый кэш постов — последние 60 постов каждого канала сохраняются на диск через load_posts_cache/save_posts_cache, мгновенно показываются после перезапуска | Готово | 3 (2 билда с ошибками компиляции) |
 
 ---
 
