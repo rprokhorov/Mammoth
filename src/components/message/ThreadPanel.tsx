@@ -366,6 +366,17 @@ export function ThreadPanel({ serverId, currentUserId, width }: ThreadPanelProps
         useThreadsStore.getState().clearThread();
       }
     }
+    if (e.key === "ArrowUp" && !text && !editingPostId && activeThreadId) {
+      const threadOrder = useThreadsStore.getState().threadOrder[activeThreadId] || [];
+      const allThreadPosts = useThreadsStore.getState().threadPosts;
+      const lastOwnPost = [...threadOrder].reverse().map((id) => allThreadPosts[id]).find(
+        (p) => p && p.user_id === currentUserId && !p.post_type && !p.delete_at
+      );
+      if (lastOwnPost) {
+        e.preventDefault();
+        handleEditPost(lastOwnPost.id);
+      }
+    }
   }
 
   async function handleToggleFollow() {

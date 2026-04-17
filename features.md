@@ -220,6 +220,8 @@ Implemented in one pass:
 | 101 | Интерактивные/bot-сообщения (post_type != "" но не "system_*") отображались как пустой system-message вместо полноценного сообщения с attachments; исправлено: isSystem теперь true только для post_type начинающегося с "system_" | Готово | 1 |
 | 102 | Системные сообщения "username joined/left the channel" скрыты: посты с типами system_join_channel, system_leave_channel, system_add_to_channel, system_remove_from_channel возвращают null в MessageItem | Готово | 1 |
 | 103 | Мгновенное открытие каналов: (A) stale-while-revalidate — кэш из памяти или диска показывается сразу без спиннера, сеть обновляет тихо в фоне; (B) prefetch при hover — get_posts запускается при наведении мыши на канал; (C) параллельный fetch пользователей — get_users_by_ids идёт параллельно с загрузкой постов; (D) дисковый кэш постов — последние 60 постов каждого канала сохраняются на диск через load_posts_cache/save_posts_cache, мгновенно показываются после перезапуска | Готово | 3 (2 билда с ошибками компиляции) |
+| 104 | Системные сообщения "joined/left the team" скрыты: типы system_join_team, system_leave_team, system_add_to_team, system_remove_from_team возвращают null в MessageItem | Готово | 1 |
+| 105 | По нажатию ArrowUp в пустом поле ввода начинается редактирование последнего собственного сообщения — в канале (MessageComposer) и в тредах (ThreadPanel) | Готово | 3 (первый fix — пустые посты открывались; второй — открывалось первое сообщение вместо последнего: order newest-first, reverse() был лишним) |
 
 ---
 

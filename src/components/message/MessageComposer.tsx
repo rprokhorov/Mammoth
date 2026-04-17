@@ -89,9 +89,11 @@ export function MessageComposer({ channelId, serverId }: MessageComposerProps) {
 
   const editingPostId = useMessagesStore((s) => s.editingPostId);
   const posts = useMessagesStore((s) => s.posts);
+  const orderByChannel = useMessagesStore((s) => s.orderByChannel);
   const setEditingPostId = useMessagesStore((s) => s.setEditingPostId);
   const updatePost = useMessagesStore((s) => s.updatePost);
   const addPost = useMessagesStore((s) => s.addPost);
+  const currentUserId = useUiStore((s) => s.currentUserId);
 
   const editingPost = editingPostId ? posts[editingPostId] : null;
 
@@ -507,6 +509,16 @@ export function MessageComposer({ channelId, serverId }: MessageComposerProps) {
     }
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
     if (e.key === "Escape" && editingPostId) { cancelEdit(); }
+    if (e.key === "ArrowUp" && !text && !editingPostId) {
+      const order = orderByChannel[channelId] || [];
+      const lastOwnPost = order.map((id) => posts[id]).find(
+        (p) => p && p.user_id === currentUserId && !p.post_type && !p.delete_at && !p.root_id && p.message.trim()
+      );
+      if (lastOwnPost) {
+        e.preventDefault();
+        setEditingPostId(lastOwnPost.id);
+      }
+    }
   }
 
   function cancelEdit() {
