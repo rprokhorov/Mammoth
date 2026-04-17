@@ -1,8 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useUiStore, type SidebarCategory } from "@/stores/uiStore";
+import { useTabsStore } from "@/stores/tabsStore";
 import { MarkdownRenderer } from "@/components/message/MarkdownRenderer";
 import { UserAvatar } from "@/components/common/UserAvatar";
+import { UserPopover } from "@/components/user/UserPopover";
 
 interface ChannelInfoPanelProps {
   serverId: string;
@@ -70,7 +72,12 @@ export function ChannelInfoPanel({
   const teams = useUiStore((s) => s.teams);
   const activeTeamId = useUiStore((s) => s.activeTeamId);
   const favoriteChannels = useUiStore((s) => s.favoriteChannels);
+  const currentUserId = useUiStore((s) => s.currentUserId);
   const channel = channels.find((ch) => ch.id === activeChannelId);
+
+  const [popover, setPopover] = useState<{ userId: string; anchor: HTMLElement } | null>(null);
+  const [dmLoading, setDmLoading] = useState<string | null>(null);
+  const avatarRefs = useRef<Record<string, HTMLButtonElement | null>>({});
 
   const [subPanel, setSubPanel] = useState<SubPanel>(null);
   const [linkCopied, setLinkCopied] = useState(false);
@@ -184,6 +191,45 @@ export function ChannelInfoPanel({
   function getUserDisplayName(user: UserInfo): string {
     const full = [user.first_name, user.last_name].filter(Boolean).join(" ");
     return full || user.nickname || user.username;
+  }
+
+  async function handleSendDm(userId: string) {
+    setDmLoading(userId);
+    try {
+      const dmChannel = await invoke<{ id: string }>("create_direct_channel", {
+        serverId,
+        otherUserId: userId,
+      });
+      const store = useUiStore.getState();
+      const user = memberUsers[userId];
+      if (!store.channels.find((c) => c.id === dmChannel.id)) {
+        store.setChannels([
+          ...store.channels,
+          {
+            id: dmChannel.id,
+            team_id: "",
+            display_name: user?.username ?? userId,
+            name: dmChannel.id,
+            channel_type: "D",
+            header: "",
+            purpose: "",
+            last_post_at: Date.now(),
+            total_msg_count: 0,
+            msg_count: 0,
+            mention_count: 0,
+            last_viewed_at: 0,
+          },
+        ]);
+      }
+      store.setActiveChannelId(dmChannel.id);
+      store.setMainSubView("channels");
+      useTabsStore.getState().navigateDefaultTab(dmChannel.id);
+      onClose();
+    } catch (e) {
+      console.error("Failed to open DM:", e);
+    } finally {
+      setDmLoading(null);
+    }
   }
 
   const subPanelTitle =
@@ -343,9 +389,17 @@ export function ChannelInfoPanel({
             <div className="channel-info-members-list">
               {members.map((m) => {
                 const user = memberUsers[m.user_id];
+                const isSelf = m.user_id === currentUserId;
                 return (
                   <div key={m.user_id} className="channel-info-member-item">
-                    <UserAvatar userId={m.user_id} username={user?.username ?? "?"} size={28} />
+                    <button
+                      className="channel-info-member-avatar-btn"
+                      ref={(el) => { avatarRefs.current[m.user_id] = el; }}
+                      onClick={() => setPopover({ userId: m.user_id, anchor: avatarRefs.current[m.user_id]! })}
+                      title="View profile"
+                    >
+                      <UserAvatar userId={m.user_id} username={user?.username ?? "?"} size={28} />
+                    </button>
                     <div className="channel-info-member-info">
                       <span className="channel-info-member-name">
                         {user ? getUserDisplayName(user) : m.user_id}
@@ -354,6 +408,16 @@ export function ChannelInfoPanel({
                     </div>
                     {m.roles.includes("channel_admin") && (
                       <span className="channel-info-member-role">Admin</span>
+                    )}
+                    {!isSelf && (
+                      <button
+                        className="channel-info-member-msg-btn"
+                        title="Send message"
+                        disabled={dmLoading === m.user_id}
+                        onClick={() => handleSendDm(m.user_id)}
+                      >
+                        {dmLoading === m.user_id ? "…" : "➤"}
+                      </button>
                     )}
                   </div>
                 );
@@ -383,6 +447,16 @@ export function ChannelInfoPanel({
             </div>
           )}
         </div>
+      )}
+
+      {/* User popover */}
+      {popover && (
+        <UserPopover
+          userId={popover.userId}
+          serverId={serverId}
+          anchorEl={popover.anchor}
+          onClose={() => setPopover(null)}
+        />
       )}
 
       {/* Files sub-panel */}
