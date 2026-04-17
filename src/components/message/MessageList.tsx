@@ -86,6 +86,7 @@ export function MessageList({
   const [isNearBottom, setIsNearBottom] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const shouldPinToBottom = useRef(false);
+  const userScrolled = useRef(false);
   const [unreadInfo, setUnreadInfo] = useState<{ firstUnreadId: string; count: number } | null>(null);
 
   const orderByChannel = useMessagesStore((s) => s.orderByChannel);
@@ -97,12 +98,15 @@ export function MessageList({
   useEffect(() => {
     let cancelled = false;
     const { setLoading, setChannelPosts } = getMessagesActions();
-    setLoading(true);
+    // Only show spinner if we have no cached posts for this channel yet.
+    const hasCached = (useMessagesStore.getState().orderByChannel[channelId]?.length ?? 0) > 0;
+    if (!hasCached) setLoading(true);
     setHasMore(true);
     setLoadError(null);
 
-    // Reset unread banner for this channel open.
+    // Reset unread banner and scroll state for this channel open.
     setUnreadInfo(null);
+    userScrolled.current = false;
 
     // Snapshot last_viewed_at from the client store (populated once at app
     // startup by loadChannels and never overwritten by view_channel). Mirrors
@@ -113,18 +117,43 @@ export function MessageList({
     }
     const lastViewedAt = getLastViewedSnapshot(channelId);
 
-    // Use the unread endpoint — it returns a chunk centered on the unread
-    // marker, so the first unread message is guaranteed to be in the chunk
-    // if one exists.
-    // Retry once on transient connection errors (e.g. connection reset on first
-    // request after app startup before the HTTP connection pool is warmed up).
-    const fetchPosts = () =>
-      invoke<UnreadPostsResponse>("get_posts_around_last_unread", {
+    // Decide which endpoint to use:
+    // - If channel has unread posts (total_msg_count > msg_count), use the
+    //   unread endpoint so the chunk is centered on the first unread post.
+    // - Otherwise use get_posts page=0 which always returns the latest posts.
+    //   The unread endpoint anchors on last_viewed_at and may miss very recent
+    //   posts when the channel is already fully read.
+    // Use unread endpoint only when last_viewed_at is strictly before last_post_at —
+    // meaning there are posts the user hasn't seen yet. In all other cases (channel
+    // fully read, msg_count=0/stale, or unknown) fetch the latest posts directly via
+    // get_posts page=0, which always returns the most recent messages.
+    const hasUnread = channelInfo
+      ? channelInfo.last_viewed_at > 0 && channelInfo.last_post_at > channelInfo.last_viewed_at
+      : false;
+
+    const fetchPosts = (): Promise<UnreadPostsResponse> => {
+      if (hasUnread) {
+        return invoke<UnreadPostsResponse>("get_posts_around_last_unread", {
+          serverId,
+          channelId,
+          limitBefore: 30,
+          limitAfter: 60,
+        });
+      }
+      // Fully read or unknown — fetch latest posts directly
+      return invoke<PostsResponse>("get_posts", {
         serverId,
         channelId,
-        limitBefore: 30,
-        limitAfter: 60,
-      });
+        page: 0,
+        perPage: 60,
+      }).then((res) => ({
+        order: res.order,
+        posts: res.posts,
+        prev_post_id: res.order.length < 60 ? "" : "placeholder",
+        next_post_id: "",
+      }));
+    };
+
     const loadPromise = fetchPosts().catch((e) => {
       if (cancelled) return Promise.reject(e);
       const msg = String(e).toLowerCase();
@@ -136,8 +165,11 @@ export function MessageList({
       return Promise.reject(e);
     }).then((res) => {
       if (!res) return;
-      if (cancelled) return;
+      // Always write posts to store even if component unmounted — safe since
+      // store is global. UI-only state (scroll, unread banner) is skipped if cancelled.
       setChannelPosts(channelId, res.order, res.posts);
+      if (cancelled) return;
+
       // prev_post_id === '' means we're at the oldest post in the channel.
       if (res.prev_post_id === "") setHasMore(false);
 
@@ -164,19 +196,18 @@ export function MessageList({
       }
 
       // Background: load thread participants for root posts with replies.
-      if (!cancelled) {
-        fetchThreadParticipants(
-          Object.values(res.posts).filter((p) => !p.root_id && (p.reply_count ?? 0) > 0).map((p) => p.id),
-          serverId,
-        );
-      }
+      fetchThreadParticipants(
+        Object.values(res.posts).filter((p) => !p.root_id && (p.reply_count ?? 0) > 0).map((p) => p.id),
+        serverId,
+      );
 
       // Always scroll to the bottom (latest message) on channel open.
+      // Pin to bottom indefinitely until the user manually scrolls up.
       requestAnimationFrame(() => {
         if (cancelled) return;
         shouldPinToBottom.current = true;
+        userScrolled.current = false;
         bottomRef.current?.scrollIntoView();
-        setTimeout(() => { shouldPinToBottom.current = false; }, 2000);
       });
 
       // Mark channel as viewed on server AFTER posts are loaded. The
@@ -262,9 +293,20 @@ export function MessageList({
     const el = scrollRef.current;
     if (!el) return;
 
-    // Check if near bottom
     const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
-    setIsNearBottom(distFromBottom < 80);
+    const nearBottom = distFromBottom < 80;
+    setIsNearBottom(nearBottom);
+
+    // If user scrolled up, stop pinning to bottom
+    if (!nearBottom && !userScrolled.current) {
+      userScrolled.current = true;
+      shouldPinToBottom.current = false;
+    }
+    // If user scrolled back to bottom, re-enable pin
+    if (nearBottom) {
+      userScrolled.current = false;
+      shouldPinToBottom.current = true;
+    }
 
     // Load older posts when scrolled to top
     if (el.scrollTop < 50 && hasMore && !loadingOlder) {
@@ -321,9 +363,8 @@ export function MessageList({
   const handleImageLoad = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return;
-    const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
-    // If we're within 300px of bottom, snap back down after image expands layout
-    if (distFromBottom < 300) {
+    // If we're pinned to bottom (user hasn't manually scrolled up), snap back down
+    if (shouldPinToBottom.current) {
       el.scrollTop = el.scrollHeight;
     }
   }, []);
@@ -390,7 +431,7 @@ export function MessageList({
     let lastUserId = "";
     let lastTime = 0;
 
-    for (const postId of displayOrder) {
+for (const postId of displayOrder) {
       const post = posts[postId];
       if (!post || post.delete_at > 0) continue;
       if (post.root_id) continue;

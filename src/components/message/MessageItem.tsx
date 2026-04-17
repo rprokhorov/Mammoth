@@ -57,7 +57,7 @@ export const MessageItem = memo(function MessageItem({
 
   const isOwn = post.user_id === currentUserId;
   const isEdited = post.edit_at > 0;
-  const isSystem = post.post_type !== "" && post.post_type !== undefined;
+  const isSystem = !!post.post_type && post.post_type.startsWith("system_");
   const hasReplies = (post.reply_count ?? 0) > 0 && !post.root_id;
   const isThreadRoot = !post.root_id && hasReplies;
 
