@@ -73,6 +73,12 @@ pub struct Channel {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChannelMemberNotifyProps {
+    #[serde(default)]
+    pub mark_unread: String, // "all" | "mention" | "none" (empty = default "all")
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChannelMember {
     pub channel_id: String,
     pub user_id: String,
@@ -84,6 +90,8 @@ pub struct ChannelMember {
     pub msg_count: i64,
     #[serde(default)]
     pub mention_count: i64,
+    #[serde(default)]
+    pub notify_props: Option<ChannelMemberNotifyProps>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

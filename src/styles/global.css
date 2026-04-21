@@ -976,6 +976,16 @@ button.secondary:hover:not(:disabled) {
   margin-left: -2px;
 }
 
+/* Active (selected) context menu item */
+.context-menu-item.context-menu-item-active {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.context-menu-item.context-menu-item-active::before {
+  content: "✓ ";
+}
+
 /* Danger context menu item */
 .context-menu-item-danger {
   color: #e04747;
@@ -1026,6 +1036,20 @@ button.secondary:hover:not(:disabled) {
 .channel-item.dragging {
   opacity: 0.4;
   cursor: grabbing;
+}
+
+.channel-item.muted-channel {
+  opacity: 0.45;
+  font-style: italic;
+}
+
+.channel-item.muted-channel:hover {
+  opacity: 0.7;
+}
+
+.channel-item.muted-channel.active {
+  opacity: 1;
+  font-style: normal;
 }
 
 .channel-group.drag-over {

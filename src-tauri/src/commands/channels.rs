@@ -73,6 +73,9 @@ pub struct ChannelWithMeta {
     pub msg_count: i64,
     pub mention_count: i64,
     pub last_viewed_at: i64,
+    /// "none" means muted, "mention" means mentions-only, "" or "all" means all messages
+    #[serde(default)]
+    pub mark_unread: String,
 }
 
 #[tauri::command]
@@ -111,10 +114,15 @@ pub async fn get_channels_for_team(
         .into_iter()
         .map(|ch| {
             let member = member_map.get(&ch.id);
+            let mark_unread = member
+                .and_then(|m| m.notify_props.as_ref())
+                .map(|np| np.mark_unread.clone())
+                .unwrap_or_default();
             ChannelWithMeta {
                 msg_count: member.map_or(0, |m| m.msg_count),
                 mention_count: member.map_or(0, |m| m.mention_count),
                 last_viewed_at: member.map_or(0, |m| m.last_viewed_at),
+                mark_unread,
                 channel: ch,
             }
         })

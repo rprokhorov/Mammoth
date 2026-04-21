@@ -148,7 +148,12 @@ export function ChannelList({ onSelectChannel, onCreateChannel, serverId, curren
     return "";
   }
 
+  function isMuted(channel: ChannelInfo): boolean {
+    return channel.mark_unread === "mention";
+  }
+
   function isUnread(channel: ChannelInfo): boolean {
+    if (isMuted(channel)) return false;
     return channel.mention_count > 0;
   }
 
@@ -216,6 +221,7 @@ export function ChannelList({ onSelectChannel, onCreateChannel, serverId, curren
         channelId,
         notifyProps: { mark_unread: level },
       });
+      useUiStore.getState().updateChannelMarkUnread(channelId, level);
     } catch (e) {
       console.error("Failed to update notification prefs:", e);
     }
@@ -439,7 +445,7 @@ export function ChannelList({ onSelectChannel, onCreateChannel, serverId, curren
     return (
       <button
         key={ch.id}
-        className={`channel-item ${activeChannelId === ch.id ? "active" : ""} ${isUnread(ch) ? "unread" : ""} ${dragChannelId === ch.id ? "dragging" : ""}`}
+        className={`channel-item ${activeChannelId === ch.id ? "active" : ""} ${isUnread(ch) ? "unread" : ""} ${isMuted(ch) ? "muted-channel" : ""} ${dragChannelId === ch.id ? "dragging" : ""}`}
         onMouseEnter={() => {
           if (serverId && ch.id !== activeChannelId) {
             prefetchChannelPosts(ch.id, serverId);
@@ -500,7 +506,7 @@ export function ChannelList({ onSelectChannel, onCreateChannel, serverId, curren
           <span className="channel-prefix">{getPrefix(ch)}</span>
         )}
         <span className="channel-name">{getDisplayName(ch)}</span>
-        {ch.mention_count > 0 && (
+        {ch.mention_count > 0 && !isMuted(ch) && (
           <span className="mention-badge">{ch.mention_count}</span>
         )}
       </button>
@@ -719,6 +725,7 @@ export function ChannelList({ onSelectChannel, onCreateChannel, serverId, curren
               getDisplayName={getDisplayName}
               getPrefix={getPrefix}
               isUnread={isUnread}
+              isMuted={isMuted}
               onSelect={onSelectChannel}
               onContextMenu={handleContextMenu}
               onMiddleClick={handleMiddleClick}
@@ -731,6 +738,7 @@ export function ChannelList({ onSelectChannel, onCreateChannel, serverId, curren
             getDisplayName={getDisplayName}
             getPrefix={() => "#"}
             isUnread={isUnread}
+            isMuted={isMuted}
             onSelect={onSelectChannel}
             onContextMenu={handleContextMenu}
             onMiddleClick={handleMiddleClick}
@@ -742,6 +750,7 @@ export function ChannelList({ onSelectChannel, onCreateChannel, serverId, curren
             getDisplayName={getDisplayName}
             getPrefix={() => "\uD83D\uDD12"}
             isUnread={isUnread}
+            isMuted={isMuted}
             onSelect={onSelectChannel}
             onContextMenu={handleContextMenu}
             onMiddleClick={handleMiddleClick}
@@ -753,6 +762,7 @@ export function ChannelList({ onSelectChannel, onCreateChannel, serverId, curren
             getDisplayName={getDisplayName}
             getPrefix={() => ""}
             isUnread={isUnread}
+            isMuted={isMuted}
             onSelect={onSelectChannel}
             onContextMenu={handleContextMenu}
             onMiddleClick={handleMiddleClick}
@@ -833,25 +843,18 @@ export function ChannelList({ onSelectChannel, onCreateChannel, serverId, curren
             )}
 
             <div className="context-menu-divider" />
-            <div className="context-menu-label">Notifications</div>
-            <button
-              className="context-menu-item"
-              onClick={() => handleSetNotifyPref(contextMenu.channelId, "all")}
-            >
-              All messages
-            </button>
-            <button
-              className="context-menu-item"
-              onClick={() => handleSetNotifyPref(contextMenu.channelId, "mention")}
-            >
-              Mentions only
-            </button>
-            <button
-              className="context-menu-item"
-              onClick={() => handleSetNotifyPref(contextMenu.channelId, "none")}
-            >
-              Mute channel
-            </button>
+            {(() => {
+              const ch = channelMap.get(contextMenu.channelId);
+              const muted = ch?.mark_unread === "mention";
+              return (
+                <button
+                  className="context-menu-item"
+                  onClick={() => handleSetNotifyPref(contextMenu.channelId, muted ? "all" : "mention")}
+                >
+                  {muted ? "Unmute channel" : "Mute channel"}
+                </button>
+              );
+            })()}
             <div className="context-menu-divider" />
             <button
               className="context-menu-item"
@@ -932,6 +935,7 @@ interface ChannelGroupProps {
   getDisplayName: (ch: ChannelInfo) => string;
   getPrefix: (ch: ChannelInfo) => string;
   isUnread: (ch: ChannelInfo) => boolean;
+  isMuted: (ch: ChannelInfo) => boolean;
   onSelect: (id: string) => void;
   onContextMenu: (e: React.MouseEvent, channelId: string) => void;
   onMiddleClick: (channelId: string) => void;
@@ -944,6 +948,7 @@ function ChannelGroup({
   getDisplayName,
   getPrefix,
   isUnread,
+  isMuted,
   onSelect,
   onContextMenu,
   onMiddleClick,
@@ -956,7 +961,7 @@ function ChannelGroup({
       {channels.map((ch) => (
         <button
           key={ch.id}
-          className={`channel-item ${activeId === ch.id ? "active" : ""} ${isUnread(ch) ? "unread" : ""}`}
+          className={`channel-item ${activeId === ch.id ? "active" : ""} ${isUnread(ch) ? "unread" : ""} ${isMuted(ch) ? "muted-channel" : ""}`}
           onClick={() => onSelect(ch.id)}
           onAuxClick={(e) => {
             if (e.button === 1) {
@@ -968,7 +973,7 @@ function ChannelGroup({
         >
           <span className="channel-prefix">{getPrefix(ch)}</span>
           <span className="channel-name">{getDisplayName(ch)}</span>
-          {ch.mention_count > 0 && (
+          {ch.mention_count > 0 && !isMuted(ch) && (
             <span className="mention-badge">{ch.mention_count}</span>
           )}
         </button>

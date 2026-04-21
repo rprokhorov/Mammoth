@@ -27,6 +27,7 @@ export interface ChannelInfo {
   msg_count: number;
   mention_count: number;
   last_viewed_at: number;
+  mark_unread?: string; // "none" = muted, "mention" = mentions only, "" or "all" = all messages
 }
 
 export interface UserInfo {
@@ -104,6 +105,7 @@ interface UiState {
   setChannels: (channels: ChannelInfo[]) => void;
   setActiveChannelId: (id: string | null) => void;
   updateChannelMentions: (channelId: string, mentionCount: number, msgCount: number) => void;
+  updateChannelMarkUnread: (channelId: string, markUnread: string) => void;
 
   // User actions
   setUsers: (users: UserInfo[]) => void;
@@ -182,6 +184,12 @@ export const useUiStore = create<UiState>((set) => ({
         ch.id === channelId
           ? { ...ch, mention_count: mentionCount, msg_count: msgCount }
           : ch,
+      ),
+    })),
+  updateChannelMarkUnread: (channelId, markUnread) =>
+    set((state) => ({
+      channels: state.channels.map((ch) =>
+        ch.id === channelId ? { ...ch, mark_unread: markUnread } : ch,
       ),
     })),
 
