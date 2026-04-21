@@ -131,6 +131,10 @@ interface UiState {
   addSidebarCategory: (category: SidebarCategory) => void;
   removeSidebarCategory: (categoryId: string) => void;
 
+  // Channel notify props cache: channelId -> props
+  channelNotifyProps: Record<string, Record<string, string>>;
+  updateChannelNotifyProps: (channelId: string, props: Record<string, string>) => void;
+
   // WS
   setWsStatus: (status: string) => void;
 }
@@ -155,6 +159,7 @@ export const useUiStore = create<UiState>((set) => ({
   favoriteChannels: new Set<string>(),
   sidebarCategories: [],
   wsStatus: "disconnected",
+  channelNotifyProps: {},
 
   setServers: (servers) => set({ servers }),
   addServer: (server) =>
@@ -254,6 +259,10 @@ export const useUiStore = create<UiState>((set) => ({
   removeSidebarCategory: (categoryId) =>
     set((state) => ({
       sidebarCategories: state.sidebarCategories.filter((c) => c.id !== categoryId),
+    })),
+  updateChannelNotifyProps: (channelId, props) =>
+    set((state) => ({
+      channelNotifyProps: { ...state.channelNotifyProps, [channelId]: { ...(state.channelNotifyProps[channelId] ?? {}), ...props } },
     })),
   setWsStatus: (status) => set({ wsStatus: status }),
 }));

@@ -18,6 +18,7 @@ interface ChannelNotifyProps {
   mark_unread?: string;       // "all" | "mention"
   ignore_channel_mentions?: string; // "on" | "off" | "default"
   desktop?: string;           // "all" | "mention" | "none" | "default"
+  desktop_threads?: string;   // "mention" | "default" — drives "notify about thread replies"
 }
 
 interface ChannelMember {
@@ -77,6 +78,8 @@ export function ChannelInfoPanel({
   const activeTeamId = useUiStore((s) => s.activeTeamId);
   const favoriteChannels = useUiStore((s) => s.favoriteChannels);
   const currentUserId = useUiStore((s) => s.currentUserId);
+  const channelNotifyPropsCache = useUiStore((s) => s.channelNotifyProps);
+  const updateChannelNotifyPropsStore = useUiStore((s) => s.updateChannelNotifyProps);
   const channel = channels.find((ch) => ch.id === activeChannelId);
 
   const [popover, setPopover] = useState<{ userId: string; anchor: HTMLElement } | null>(null);
@@ -100,17 +103,19 @@ export function ChannelInfoPanel({
   const [filesLoading, setFilesLoading] = useState(false);
 
   // Notification prefs state
-  const [notifyProps, setNotifyProps] = useState<ChannelNotifyProps | null>(null);
   const [notifyLoading, setNotifyLoading] = useState(false);
   const [notifySaving, setNotifySaving] = useState(false);
 
-  // Keep mark_unread in sync with the store (updated via WebSocket from other clients)
-  const channelMarkUnread = channel?.mark_unread;
-  useEffect(() => {
-    if (notifyProps && !notifySaving && channelMarkUnread !== undefined) {
-      setNotifyProps((prev) => prev ? { ...prev, mark_unread: channelMarkUnread } : prev);
-    }
-  }, [channelMarkUnread]);
+  // Derive notifyProps reactively from the store cache so WS updates are reflected automatically
+  const cachedRaw = activeChannelId ? channelNotifyPropsCache[activeChannelId] : undefined;
+const notifyProps: ChannelNotifyProps | null = cachedRaw
+    ? {
+        mark_unread: cachedRaw.mark_unread ?? channel?.mark_unread ?? "all",
+        ignore_channel_mentions: cachedRaw.ignore_channel_mentions ?? "default",
+        desktop: cachedRaw.desktop ?? "default",
+        desktop_threads: cachedRaw.desktop_threads ?? "default",
+      }
+    : null;
 
   useEffect(() => {
     setSubPanel(null);
@@ -170,7 +175,8 @@ export function ChannelInfoPanel({
         serverId,
         channelId: channel.id,
       })
-        .then((raw) => {
+        .then((rawResult) => {
+          const raw: Record<string, string> = rawResult as Record<string, string>;
           // API returns "default" when a setting is not explicitly configured.
           // For mark_unread, fall back to the store value which reflects the actual state.
           const storeMarkUnread = useUiStore.getState().channels.find(c => c.id === channel.id)?.mark_unread;
@@ -182,10 +188,10 @@ export function ChannelInfoPanel({
             rawMarkUnread !== undefined && rawMarkUnread !== null && rawMarkUnread !== "default"
               ? rawMarkUnread
               : (storeMarkUnread ?? "all");
-          setNotifyProps({
+          // Store in cache — panel reads reactively from store, so WS updates are reflected automatically
+          updateChannelNotifyPropsStore(channel.id, {
+            ...raw,
             mark_unread: markUnread,
-            ignore_channel_mentions: raw.ignore_channel_mentions ?? "default",
-            desktop: raw.desktop ?? "default",
           });
         })
         .catch(console.error)
@@ -310,7 +316,8 @@ export function ChannelInfoPanel({
   async function handleNotifyPropChange(patch: Partial<ChannelNotifyProps>) {
     if (!channel || !notifyProps) return;
     const updated = { ...notifyProps, ...patch };
-    setNotifyProps(updated);
+    // Optimistic update in store (panel reads reactively)
+    updateChannelNotifyPropsStore(channel.id, patch as Record<string, string>);
     setNotifySaving(true);
     try {
       // Send only the known writable fields — exclude any extra fields the API may have returned
@@ -321,15 +328,17 @@ export function ChannelInfoPanel({
           mark_unread: updated.mark_unread,
           ignore_channel_mentions: updated.ignore_channel_mentions,
           desktop: updated.desktop,
+          desktop_threads: updated.desktop_threads,
         },
       });
-      // Sync mark_unread to the store so sidebar updates
+      // Sync mark_unread to the channels store so sidebar updates
       if (patch.mark_unread !== undefined) {
         useUiStore.getState().updateChannelMarkUnread(channel.id, patch.mark_unread);
       }
     } catch (e) {
       console.error("Failed to update notify props:", e);
-      setNotifyProps(notifyProps);
+      // Rollback optimistic update
+      updateChannelNotifyPropsStore(channel.id, notifyProps as Record<string, string>);
     } finally {
       setNotifySaving(false);
     }
@@ -602,37 +611,72 @@ export function ChannelInfoPanel({
                 </label>
               </div>
 
-              {/* Desktop Notifications section */}
-              <div className="notif-prefs-section">
-                <div className="notif-prefs-section-title">Desktop Notifications</div>
-                <div className="notif-prefs-section-desc">Available on Chrome, Edge, Firefox, and the Mattermost Desktop App.</div>
-                <div className="notif-prefs-subsection-title">Notify me about…</div>
+              {/* Notify me about + Thread replies — only when channel is not muted */}
+              {notifyProps.mark_unread !== "mention" && (
+                <>
+                  {/* Notify me about section */}
+                  <div className="notif-prefs-section">
+                    <div className="notif-prefs-section-title">Notify me about...</div>
 
-                <label className="notif-prefs-radio-row">
-                  <input
-                    type="radio"
-                    name="desktop-notify"
-                    checked={(notifyProps.desktop ?? "default") === "all"}
-                    disabled={notifySaving}
-                    onChange={() => handleNotifyPropChange({ desktop: "all" })}
-                  />
-                  <span>All new messages</span>
-                </label>
+                    <label className="notif-prefs-radio-row">
+                      <input
+                        type="radio"
+                        name="desktop-notify"
+                        checked={(notifyProps.desktop ?? "default") === "all"}
+                        disabled={notifySaving}
+                        onChange={() => handleNotifyPropChange({ desktop: "all" })}
+                      />
+                      <span>All new messages</span>
+                    </label>
 
-                <label className="notif-prefs-radio-row">
-                  <input
-                    type="radio"
-                    name="desktop-notify"
-                    checked={
-                      (notifyProps.desktop ?? "default") === "mention" ||
-                      (notifyProps.desktop ?? "default") === "default"
-                    }
-                    disabled={notifySaving}
-                    onChange={() => handleNotifyPropChange({ desktop: "mention" })}
-                  />
-                  <span>Mentions, direct messages, and keywords only <span className="notif-prefs-default-badge">(default)</span></span>
-                </label>
-              </div>
+                    <label className="notif-prefs-radio-row">
+                      <input
+                        type="radio"
+                        name="desktop-notify"
+                        checked={
+                          (notifyProps.desktop ?? "default") === "mention" ||
+                          (notifyProps.desktop ?? "default") === "default"
+                        }
+                        disabled={notifySaving}
+                        onChange={() => handleNotifyPropChange({ desktop: "mention" })}
+                      />
+                      <span>Mentions, direct messages and keywords only <span className="notif-prefs-default-badge">(default)</span></span>
+                    </label>
+
+                    <label className="notif-prefs-radio-row">
+                      <input
+                        type="radio"
+                        name="desktop-notify"
+                        checked={(notifyProps.desktop ?? "default") === "none"}
+                        disabled={notifySaving}
+                        onChange={() => handleNotifyPropChange({ desktop: "none" })}
+                      />
+                      <span>Nothing</span>
+                    </label>
+                  </div>
+
+                  {/* Thread reply notifications section — only when "mentions only" is selected */}
+                  {((notifyProps.desktop ?? "default") === "mention" || (notifyProps.desktop ?? "default") === "default") && (
+                  <div className="notif-prefs-section">
+                    <div className="notif-prefs-section-title">Thread reply notifications</div>
+
+                    <label className="notif-prefs-checkbox-row">
+                      <input
+                        type="checkbox"
+                        checked={notifyProps.desktop_threads !== "mention"}
+                        disabled={notifySaving}
+                        onChange={(e) =>
+                          handleNotifyPropChange({ desktop_threads: e.target.checked ? "default" : "mention" })
+                        }
+                      />
+                      <div className="notif-prefs-checkbox-label">
+                        <span>Notify me about replies to threads I'm following</span>
+                      </div>
+                    </label>
+                  </div>
+                  )}
+                </>
+              )}
             </div>
           )}
         </div>

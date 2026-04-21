@@ -421,12 +421,17 @@ function handleChannelMemberUpdated(data: Record<string, unknown>) {
     if (!memberStr) return;
     const member = JSON.parse(memberStr) as {
       channel_id: string;
-      notify_props?: { mark_unread?: string };
+      notify_props?: Record<string, string>;
     };
     if (!member.channel_id) return;
-    const markUnread = member.notify_props?.mark_unread;
-    if (markUnread !== undefined) {
-      useUiStore.getState().updateChannelMarkUnread(member.channel_id, markUnread);
+    const notifyProps = member.notify_props;
+    if (notifyProps) {
+      // Sync mark_unread to channels store (drives sidebar mute indicator)
+      if (notifyProps.mark_unread !== undefined) {
+        useUiStore.getState().updateChannelMarkUnread(member.channel_id, notifyProps.mark_unread);
+      }
+      // Sync full notify_props to cache (drives notification prefs panel)
+      useUiStore.getState().updateChannelNotifyProps(member.channel_id, notifyProps);
     }
   } catch {
     // ignore parse errors

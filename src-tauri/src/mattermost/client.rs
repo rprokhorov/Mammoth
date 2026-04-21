@@ -1310,7 +1310,13 @@ impl MattermostClient {
             .get_authenticated(&format!("/channels/{}/members/{}", channel_id, user_id))
             .await?;
         let member: serde_json::Value = resp.json().await?;
-        Ok(member.get("notify_props").cloned().unwrap_or_default())
+        let val = member.get("notify_props").cloned().unwrap_or_default();
+        // Some server versions return notify_props as a JSON-encoded string — parse it if so
+        if let serde_json::Value::String(s) = &val {
+            Ok(serde_json::from_str(s).unwrap_or(val))
+        } else {
+            Ok(val)
+        }
     }
 
     pub async fn update_channel_notify_props(

@@ -227,6 +227,7 @@ Implemented in one pass:
 | 108 | В списке Members канала администраторы отображаются первыми, затем остальные участники | Готово | 1 |
 | 109 | Замьюченные каналы в боковой панели отображаются бледнее (opacity 0.45, курсив) и не показывают бейдж непрочитанных; Mute/Unmute доступен по кнопке в панели информации о канале и через контекстное меню; Mute = mark_unread:"mention" по Mattermost API; бэкенд передаёт notify_props.mark_unread из ChannelMember | Готово | 1 |
 | 110 | Notification Preferences в панели канала: секция "Mute or ignore" (checkbox Mute channel + checkbox Ignore @channel/@here/@all), секция "Desktop Notifications" (radio All new messages / Mentions only); синхронизация через WS channel_member_updated; исправлен формат тела запроса PUT /channels/{id}/members/{user_id}/notify_props (плоский объект, не обёрнут в "notify_props"); mark_unread синхронизируется с локальным state через useEffect | Готово | 4 |
+| 111 | Notification Preferences: если канал не замьючен — показываются секции "Notify me about..." (3 radio: all / mentions+DMs+keywords / nothing) и "Thread reply notifications" (checkbox); Thread reply показывается только при выборе "mentions only"; синхронизация всех полей notify_props через WS в реальном времени (store cache); исправлена двойная сериализация notify_props на стороне Rust (server возвращает JSON-строку); поле desktop_threads (не channel_auto_follow_threads) управляет checkbox тредов: "default"=включён, "mention"=выключён | Готово | 8 |
 
 ---
 
