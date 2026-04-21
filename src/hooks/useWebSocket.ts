@@ -94,6 +94,9 @@ export function useWebSocket() {
         case "open_dialog":
           handleOpenDialog(data, server_id);
           break;
+        case "channel_member_updated":
+          handleChannelMemberUpdated(data);
+          break;
         default:
           console.log("WS event (unhandled):", eventType, JSON.stringify(data));
       }
@@ -407,6 +410,24 @@ function handleReactionRemoved(
     };
 
     removeReactionFromPost(reaction);
+  } catch {
+    // ignore parse errors
+  }
+}
+
+function handleChannelMemberUpdated(data: Record<string, unknown>) {
+  try {
+    const memberStr = data.channelMember as string | undefined;
+    if (!memberStr) return;
+    const member = JSON.parse(memberStr) as {
+      channel_id: string;
+      notify_props?: { mark_unread?: string };
+    };
+    if (!member.channel_id) return;
+    const markUnread = member.notify_props?.mark_unread;
+    if (markUnread !== undefined) {
+      useUiStore.getState().updateChannelMarkUnread(member.channel_id, markUnread);
+    }
   } catch {
     // ignore parse errors
   }

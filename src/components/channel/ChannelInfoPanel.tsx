@@ -9,11 +9,16 @@ import { UserPopover } from "@/components/user/UserPopover";
 interface ChannelInfoPanelProps {
   serverId: string;
   onClose: () => void;
-  onOpenNotificationPrefs: () => void;
   width?: number;
 }
 
-type SubPanel = "members" | "pinned" | "files" | null;
+type SubPanel = "members" | "pinned" | "files" | "notification-prefs" | null;
+
+interface ChannelNotifyProps {
+  mark_unread?: string;       // "all" | "mention"
+  ignore_channel_mentions?: string; // "on" | "off" | "default"
+  desktop?: string;           // "all" | "mention" | "none" | "default"
+}
 
 interface ChannelMember {
   user_id: string;
@@ -63,7 +68,6 @@ function formatDate(ts: number): string {
 export function ChannelInfoPanel({
   serverId,
   onClose,
-  onOpenNotificationPrefs,
   width = 300,
 }: ChannelInfoPanelProps) {
   const channels = useUiStore((s) => s.channels);
@@ -94,6 +98,19 @@ export function ChannelInfoPanel({
   // Files state
   const [files, setFiles] = useState<FileInfo[]>([]);
   const [filesLoading, setFilesLoading] = useState(false);
+
+  // Notification prefs state
+  const [notifyProps, setNotifyProps] = useState<ChannelNotifyProps | null>(null);
+  const [notifyLoading, setNotifyLoading] = useState(false);
+  const [notifySaving, setNotifySaving] = useState(false);
+
+  // Keep mark_unread in sync with the store (updated via WebSocket from other clients)
+  const channelMarkUnread = channel?.mark_unread;
+  useEffect(() => {
+    if (notifyProps && !notifySaving && channelMarkUnread !== undefined) {
+      setNotifyProps((prev) => prev ? { ...prev, mark_unread: channelMarkUnread } : prev);
+    }
+  }, [channelMarkUnread]);
 
   useEffect(() => {
     setSubPanel(null);
@@ -143,6 +160,36 @@ export function ChannelInfoPanel({
         })
         .catch(console.error)
         .finally(() => setPinnedLoading(false));
+    }
+  }, [subPanel, channel?.id]);
+
+  useEffect(() => {
+    if (subPanel === "notification-prefs" && channel) {
+      setNotifyLoading(true);
+      invoke<Record<string, string>>("get_channel_notify_props", {
+        serverId,
+        channelId: channel.id,
+      })
+        .then((raw) => {
+          // API returns "default" when a setting is not explicitly configured.
+          // For mark_unread, fall back to the store value which reflects the actual state.
+          const storeMarkUnread = useUiStore.getState().channels.find(c => c.id === channel.id)?.mark_unread;
+          // mark_unread: "" and "all" both mean "not muted"; "mention" means muted.
+          // API can return "" (empty string) for the default/unmuted state — that is falsy in JS,
+          // so we must check for undefined/null explicitly rather than using a truthy check.
+          const rawMarkUnread = raw.mark_unread;
+          const markUnread =
+            rawMarkUnread !== undefined && rawMarkUnread !== null && rawMarkUnread !== "default"
+              ? rawMarkUnread
+              : (storeMarkUnread ?? "all");
+          setNotifyProps({
+            mark_unread: markUnread,
+            ignore_channel_mentions: raw.ignore_channel_mentions ?? "default",
+            desktop: raw.desktop ?? "default",
+          });
+        })
+        .catch(console.error)
+        .finally(() => setNotifyLoading(false));
     }
   }, [subPanel, channel?.id]);
 
@@ -257,7 +304,36 @@ export function ChannelInfoPanel({
   const subPanelTitle =
     subPanel === "members" ? "Members" :
     subPanel === "pinned" ? "Pinned Messages" :
-    subPanel === "files" ? "Files" : null;
+    subPanel === "files" ? "Files" :
+    subPanel === "notification-prefs" ? "Notification Preferences" : null;
+
+  async function handleNotifyPropChange(patch: Partial<ChannelNotifyProps>) {
+    if (!channel || !notifyProps) return;
+    const updated = { ...notifyProps, ...patch };
+    setNotifyProps(updated);
+    setNotifySaving(true);
+    try {
+      // Send only the known writable fields — exclude any extra fields the API may have returned
+      await invoke("update_channel_notify_props", {
+        serverId,
+        channelId: channel.id,
+        notifyProps: {
+          mark_unread: updated.mark_unread,
+          ignore_channel_mentions: updated.ignore_channel_mentions,
+          desktop: updated.desktop,
+        },
+      });
+      // Sync mark_unread to the store so sidebar updates
+      if (patch.mark_unread !== undefined) {
+        useUiStore.getState().updateChannelMarkUnread(channel.id, patch.mark_unread);
+      }
+    } catch (e) {
+      console.error("Failed to update notify props:", e);
+      setNotifyProps(notifyProps);
+    } finally {
+      setNotifySaving(false);
+    }
+  }
 
   return (
     <div className="channel-info-panel" style={{ width }}>
@@ -365,7 +441,7 @@ export function ChannelInfoPanel({
 
           {/* Navigation buttons */}
           <div className="channel-info-nav-section">
-            <button className="channel-info-nav-btn" onClick={onOpenNotificationPrefs}>
+            <button className="channel-info-nav-btn" onClick={() => setSubPanel("notification-prefs")}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
                 <path d="M13.73 21a2 2 0 0 1-3.46 0" />
@@ -477,6 +553,86 @@ export function ChannelInfoPanel({
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Notification Preferences sub-panel */}
+      {subPanel === "notification-prefs" && (
+        <div className="channel-info-panel-body">
+          {notifyLoading ? (
+            <div className="channel-info-loading">Loading…</div>
+          ) : !notifyProps ? (
+            <div className="channel-info-empty">Failed to load preferences</div>
+          ) : (
+            <div className="notif-prefs">
+              {/* Mute or ignore section */}
+              <div className="notif-prefs-section">
+                <div className="notif-prefs-section-title">Mute or ignore</div>
+
+                <label className="notif-prefs-checkbox-row">
+                  <input
+                    type="checkbox"
+                    checked={notifyProps.mark_unread === "mention"}
+                    disabled={notifySaving}
+                    onChange={(e) =>
+                      handleNotifyPropChange({ mark_unread: e.target.checked ? "mention" : "all" })
+                    }
+                  />
+                  <div className="notif-prefs-checkbox-label">
+                    <span>Mute channel</span>
+                    <span className="notif-prefs-desc">Turns off notifications for this channel. You'll still see badges if you're mentioned.</span>
+                  </div>
+                </label>
+
+                <label className="notif-prefs-checkbox-row">
+                  <input
+                    type="checkbox"
+                    checked={notifyProps.ignore_channel_mentions === "on"}
+                    disabled={notifySaving}
+                    onChange={(e) =>
+                      handleNotifyPropChange({ ignore_channel_mentions: e.target.checked ? "on" : "off" })
+                    }
+                  />
+                  <div className="notif-prefs-checkbox-label">
+                    <span>Ignore mentions for @channel, @here and @all</span>
+                    <span className="notif-prefs-desc">When enabled, @channel, @here and @all will not trigger mentions or mention notifications in this channel.</span>
+                  </div>
+                </label>
+              </div>
+
+              {/* Desktop Notifications section */}
+              <div className="notif-prefs-section">
+                <div className="notif-prefs-section-title">Desktop Notifications</div>
+                <div className="notif-prefs-section-desc">Available on Chrome, Edge, Firefox, and the Mattermost Desktop App.</div>
+                <div className="notif-prefs-subsection-title">Notify me about…</div>
+
+                <label className="notif-prefs-radio-row">
+                  <input
+                    type="radio"
+                    name="desktop-notify"
+                    checked={(notifyProps.desktop ?? "default") === "all"}
+                    disabled={notifySaving}
+                    onChange={() => handleNotifyPropChange({ desktop: "all" })}
+                  />
+                  <span>All new messages</span>
+                </label>
+
+                <label className="notif-prefs-radio-row">
+                  <input
+                    type="radio"
+                    name="desktop-notify"
+                    checked={
+                      (notifyProps.desktop ?? "default") === "mention" ||
+                      (notifyProps.desktop ?? "default") === "default"
+                    }
+                    disabled={notifySaving}
+                    onChange={() => handleNotifyPropChange({ desktop: "mention" })}
+                  />
+                  <span>Mentions, direct messages, and keywords only <span className="notif-prefs-default-badge">(default)</span></span>
+                </label>
+              </div>
             </div>
           )}
         </div>

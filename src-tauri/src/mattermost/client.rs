@@ -1320,16 +1320,20 @@ impl MattermostClient {
         notify_props: serde_json::Value,
     ) -> Result<(), AppError> {
         let auth = self.auth_header()?;
-        let body = serde_json::json!({
-            "channel_id": channel_id,
-            "user_id": user_id,
-            "notify_props": notify_props,
-        });
+        // Mattermost API v4: PUT /channels/{id}/members/{user_id}/notify_props
+        // expects a flat ChannelNotifyProps object with channel_id and user_id at the top level,
+        // NOT wrapped in a "notify_props" key.
+        let mut body = match notify_props {
+            serde_json::Value::Object(map) => map,
+            _ => serde_json::Map::new(),
+        };
+        body.insert("channel_id".to_string(), serde_json::Value::String(channel_id.to_string()));
+        body.insert("user_id".to_string(), serde_json::Value::String(user_id.to_string()));
         let resp = self
             .http
             .put(self.api_url(&format!("/channels/{}/members/{}/notify_props", channel_id, user_id)))
             .header(header::AUTHORIZATION, &auth)
-            .json(&body)
+            .json(&serde_json::Value::Object(body))
             .send()
             .await?;
 

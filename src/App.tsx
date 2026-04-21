@@ -838,7 +838,6 @@ function AppContent() {
                 <ChannelInfoPanel
                   serverId={activeServerId}
                   onClose={() => setShowChannelInfo(false)}
-                  onOpenNotificationPrefs={() => {}}
                   width={threadWidth}
                 />
               </>
