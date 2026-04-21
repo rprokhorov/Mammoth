@@ -109,6 +109,39 @@ export function useWebSocket() {
   }, [activeServerId]);
 }
 
+function shouldNotify(
+  post: PostData,
+  channel: { mark_unread?: string },
+  channelId: string,
+): boolean {
+  // Skip system messages (join/leave/add/remove etc.)
+  if (post.post_type && post.post_type.startsWith("system_")) return false;
+
+  // Skip muted channels
+  if (channel.mark_unread === "none") return false;
+
+  const { channelNotifyProps, currentUserId, users } = useUiStore.getState();
+  const notifyProps = channelNotifyProps[channelId];
+  const desktopPref = notifyProps?.desktop ?? "default";
+
+  // "none" — user explicitly disabled notifications for this channel
+  if (desktopPref === "none") return false;
+
+  // "mention" — only notify if post mentions current user or @channel/@all
+  if (desktopPref === "mention" || channel.mark_unread === "mention") {
+    if (!currentUserId) return false;
+    const currentUser = users[currentUserId];
+    const username = currentUser?.username ?? "";
+    const msg = post.message.toLowerCase();
+    const mentionedExplicitly = username && msg.includes(`@${username}`);
+    const mentionedAll = msg.includes("@channel") || msg.includes("@all") || msg.includes("@here");
+    return mentionedExplicitly || mentionedAll;
+  }
+
+  // "all" or "default" — notify for all messages
+  return true;
+}
+
 function handlePosted(
   data: Record<string, unknown>,
   broadcast: { channel_id: string },
@@ -170,18 +203,30 @@ function handlePosted(
     );
 
     // Send desktop notification for messages in non-active channels
-    if (notifPermission && post) {
+    if (notifPermission && post && shouldNotify(post, channel, channelId)) {
       const sender = users[post.user_id];
+      const senderUsername = sender?.username ?? "someone";
       const senderName = sender
         ? sender.nickname || `${sender.first_name} ${sender.last_name}`.trim() || sender.username
         : "Someone";
-      const channelName = channel.display_name || channel.name;
+
+      let notifTitle: string;
+      if (channel.channel_type === "D") {
+        notifTitle = `@${senderUsername} in Direct Message`;
+      } else if (channel.channel_type === "G") {
+        const groupName = channel.display_name || "Group Message";
+        notifTitle = `@${senderUsername} in ${groupName}`;
+      } else {
+        const channelName = channel.display_name || channel.name;
+        notifTitle = `${senderName} in ${channelName}`;
+      }
+
       const preview = post.message.length > 100
         ? post.message.slice(0, 100) + "..."
         : post.message;
 
       invoke("show_notification", {
-        title: `${senderName} in ${channelName}`,
+        title: notifTitle,
         body: preview,
         channelId,
       }).catch(() => {});
