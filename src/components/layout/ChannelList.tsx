@@ -87,6 +87,9 @@ export function ChannelList({ onSelectChannel, onCreateChannel, serverId, curren
   // Quick switcher
   const [showQuickSwitcher, setShowQuickSwitcher] = useState(false);
 
+  // Unread filter
+  const [filterUnread, setFilterUnread] = useState(false);
+
   // DM limit
   const DM_LIMIT_OPTIONS = [10, 15, 20, 40];
   const [dmLimit, setDmLimit] = useState<number>(() => {
@@ -99,6 +102,10 @@ export function ChannelList({ onSelectChannel, onCreateChannel, serverId, curren
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
         e.preventDefault();
         setShowQuickSwitcher((v) => !v);
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key === "u") {
+        e.preventDefault();
+        setFilterUnread((v) => !v);
       }
     }
     window.addEventListener("keydown", handleKey);
@@ -595,15 +602,24 @@ export function ChannelList({ onSelectChannel, onCreateChannel, serverId, curren
       }}
     >
       <div className="channel-list-header">
-        <button
-          className="channel-item find-nav-btn"
-          onClick={() => setShowQuickSwitcher(true)}
-          title="Find channels or people (⌘K)"
-        >
-          <span className="channel-prefix">🔍</span>
-          <span className="channel-name">Find channel or user</span>
-          <span className="quick-switcher-shortcut">⌘K</span>
-        </button>
+        <div className="channel-list-find-row">
+          <button
+            className={`unread-filter-btn ${filterUnread ? "active" : ""}`}
+            onClick={() => setFilterUnread((v) => !v)}
+            title="Filter by unread (⌘U)"
+          >
+            <span className="unread-filter-label">☰</span>
+          </button>
+          <button
+            className="channel-item find-nav-btn"
+            onClick={() => setShowQuickSwitcher(true)}
+            title="Find channels or people (⌘K)"
+          >
+            <span className="channel-prefix">🔍</span>
+            <span className="channel-name">Find channel or user</span>
+            <span className="quick-switcher-shortcut">⌘K</span>
+          </button>
+        </div>
         <button
           className={`channel-item threads-nav-btn ${mainSubView === "threads" ? "active" : ""}`}
           onClick={handleThreadsClick}
@@ -648,8 +664,13 @@ export function ChannelList({ onSelectChannel, onCreateChannel, serverId, curren
               const catChannels = cat.category_type === "direct_messages"
                 ? [...allCatChannels].sort((a, b) => b.last_post_at - a.last_post_at).slice(0, dmLimit)
                 : allCatChannels;
+              const visibleCatChannels = filterUnread
+                ? catChannels.filter((ch) => isUnread(ch))
+                : catChannels;
 
               const isCollapsed = collapsedCategories.has(cat.id);
+
+              if (filterUnread && visibleCatChannels.length === 0) return null;
 
               return (
                 <div
@@ -677,7 +698,7 @@ export function ChannelList({ onSelectChannel, onCreateChannel, serverId, curren
                   }}
                 >
                   {renderCategoryHeader(cat)}
-                  {!isCollapsed && catChannels.map(renderChannel)}
+                  {!isCollapsed && visibleCatChannels.map(renderChannel)}
                 </div>
               );
             })}
@@ -717,56 +738,74 @@ export function ChannelList({ onSelectChannel, onCreateChannel, serverId, curren
       ) : (
         // Fallback static grouping
         <>
-          {favoriteList.length > 0 && (
-            <ChannelGroup
-              title="Favorites"
-              channels={favoriteList}
-              activeId={activeChannelId}
-              getDisplayName={getDisplayName}
-              getPrefix={getPrefix}
-              isUnread={isUnread}
-              isMuted={isMuted}
-              onSelect={onSelectChannel}
-              onContextMenu={handleContextMenu}
-              onMiddleClick={handleMiddleClick}
-            />
-          )}
-          <ChannelGroup
-            title="Public Channels"
-            channels={publicChannels}
-            activeId={activeChannelId}
-            getDisplayName={getDisplayName}
-            getPrefix={() => "#"}
-            isUnread={isUnread}
-            isMuted={isMuted}
-            onSelect={onSelectChannel}
-            onContextMenu={handleContextMenu}
-            onMiddleClick={handleMiddleClick}
-          />
-          <ChannelGroup
-            title="Private Channels"
-            channels={privateChannels}
-            activeId={activeChannelId}
-            getDisplayName={getDisplayName}
-            getPrefix={() => "\uD83D\uDD12"}
-            isUnread={isUnread}
-            isMuted={isMuted}
-            onSelect={onSelectChannel}
-            onContextMenu={handleContextMenu}
-            onMiddleClick={handleMiddleClick}
-          />
-          <ChannelGroup
-            title="Direct Messages"
-            channels={dmChannels.slice(0, dmLimit)}
-            activeId={activeChannelId}
-            getDisplayName={getDisplayName}
-            getPrefix={() => ""}
-            isUnread={isUnread}
-            isMuted={isMuted}
-            onSelect={onSelectChannel}
-            onContextMenu={handleContextMenu}
-            onMiddleClick={handleMiddleClick}
-          />
+          {(() => {
+            const filteredFavorites = filterUnread ? favoriteList.filter(isUnread) : favoriteList;
+            const filteredPublic = filterUnread ? publicChannels.filter(isUnread) : publicChannels;
+            const filteredPrivate = filterUnread ? privateChannels.filter(isUnread) : privateChannels;
+            const filteredDm = filterUnread
+              ? dmChannels.slice(0, dmLimit).filter(isUnread)
+              : dmChannels.slice(0, dmLimit);
+            return (
+              <>
+                {filteredFavorites.length > 0 && (
+                  <ChannelGroup
+                    title="Favorites"
+                    channels={filteredFavorites}
+                    activeId={activeChannelId}
+                    getDisplayName={getDisplayName}
+                    getPrefix={getPrefix}
+                    isUnread={isUnread}
+                    isMuted={isMuted}
+                    onSelect={onSelectChannel}
+                    onContextMenu={handleContextMenu}
+                    onMiddleClick={handleMiddleClick}
+                  />
+                )}
+                {filteredPublic.length > 0 && (
+                  <ChannelGroup
+                    title="Public Channels"
+                    channels={filteredPublic}
+                    activeId={activeChannelId}
+                    getDisplayName={getDisplayName}
+                    getPrefix={() => "#"}
+                    isUnread={isUnread}
+                    isMuted={isMuted}
+                    onSelect={onSelectChannel}
+                    onContextMenu={handleContextMenu}
+                    onMiddleClick={handleMiddleClick}
+                  />
+                )}
+                {filteredPrivate.length > 0 && (
+                  <ChannelGroup
+                    title="Private Channels"
+                    channels={filteredPrivate}
+                    activeId={activeChannelId}
+                    getDisplayName={getDisplayName}
+                    getPrefix={() => "\uD83D\uDD12"}
+                    isUnread={isUnread}
+                    isMuted={isMuted}
+                    onSelect={onSelectChannel}
+                    onContextMenu={handleContextMenu}
+                    onMiddleClick={handleMiddleClick}
+                  />
+                )}
+                {filteredDm.length > 0 && (
+                  <ChannelGroup
+                    title="Direct Messages"
+                    channels={filteredDm}
+                    activeId={activeChannelId}
+                    getDisplayName={getDisplayName}
+                    getPrefix={() => ""}
+                    isUnread={isUnread}
+                    isMuted={isMuted}
+                    onSelect={onSelectChannel}
+                    onContextMenu={handleContextMenu}
+                    onMiddleClick={handleMiddleClick}
+                  />
+                )}
+              </>
+            );
+          })()}
         </>
       )}
 

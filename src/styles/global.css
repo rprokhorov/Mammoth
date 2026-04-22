@@ -3257,6 +3257,51 @@ pre.code-block.mermaid-code {
 
 .find-nav-btn {
   color: var(--text-muted);
+  flex: 1;
+  min-width: 0;
+}
+
+.channel-list-find-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.unread-filter-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  margin-left: 16px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 11px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.unread-filter-btn:hover {
+  background: var(--hover-bg, rgba(128,128,128,0.1));
+  color: var(--text);
+}
+
+.unread-filter-btn.active {
+  background: var(--button-bg, #1c58d9);
+  border-color: var(--button-bg, #1c58d9);
+  color: #fff;
+}
+
+.unread-filter-btn.active .quick-switcher-shortcut {
+  color: rgba(255,255,255,0.7);
+}
+
+.unread-filter-label {
+  font-size: 11px;
+  font-weight: 500;
 }
 
 .dm-limit-select {
