@@ -159,9 +159,15 @@ export function ChannelList({ onSelectChannel, onCreateChannel, serverId, curren
     return channel.mark_unread === "mention";
   }
 
-  function isUnread(channel: ChannelInfo): boolean {
+  function hasMention(channel: ChannelInfo): boolean {
     if (isMuted(channel)) return false;
     return channel.mention_count > 0;
+  }
+
+  function isUnread(channel: ChannelInfo): boolean {
+    if (isMuted(channel)) return false;
+    // Has unread messages (total > seen) OR has explicit @mentions
+    return channel.total_msg_count > channel.msg_count || channel.mention_count > 0;
   }
 
   function handleThreadsClick() {
@@ -513,7 +519,7 @@ export function ChannelList({ onSelectChannel, onCreateChannel, serverId, curren
           <span className="channel-prefix">{getPrefix(ch)}</span>
         )}
         <span className="channel-name">{getDisplayName(ch)}</span>
-        {ch.mention_count > 0 && !isMuted(ch) && (
+        {hasMention(ch) && (
           <span className="mention-badge">{ch.mention_count}</span>
         )}
       </button>
@@ -756,6 +762,7 @@ export function ChannelList({ onSelectChannel, onCreateChannel, serverId, curren
                     getPrefix={getPrefix}
                     isUnread={isUnread}
                     isMuted={isMuted}
+                    hasMention={hasMention}
                     onSelect={onSelectChannel}
                     onContextMenu={handleContextMenu}
                     onMiddleClick={handleMiddleClick}
@@ -770,6 +777,7 @@ export function ChannelList({ onSelectChannel, onCreateChannel, serverId, curren
                     getPrefix={() => "#"}
                     isUnread={isUnread}
                     isMuted={isMuted}
+                    hasMention={hasMention}
                     onSelect={onSelectChannel}
                     onContextMenu={handleContextMenu}
                     onMiddleClick={handleMiddleClick}
@@ -784,6 +792,7 @@ export function ChannelList({ onSelectChannel, onCreateChannel, serverId, curren
                     getPrefix={() => "\uD83D\uDD12"}
                     isUnread={isUnread}
                     isMuted={isMuted}
+                    hasMention={hasMention}
                     onSelect={onSelectChannel}
                     onContextMenu={handleContextMenu}
                     onMiddleClick={handleMiddleClick}
@@ -798,6 +807,7 @@ export function ChannelList({ onSelectChannel, onCreateChannel, serverId, curren
                     getPrefix={() => ""}
                     isUnread={isUnread}
                     isMuted={isMuted}
+                    hasMention={hasMention}
                     onSelect={onSelectChannel}
                     onContextMenu={handleContextMenu}
                     onMiddleClick={handleMiddleClick}
@@ -975,6 +985,7 @@ interface ChannelGroupProps {
   getPrefix: (ch: ChannelInfo) => string;
   isUnread: (ch: ChannelInfo) => boolean;
   isMuted: (ch: ChannelInfo) => boolean;
+  hasMention: (ch: ChannelInfo) => boolean;
   onSelect: (id: string) => void;
   onContextMenu: (e: React.MouseEvent, channelId: string) => void;
   onMiddleClick: (channelId: string) => void;
@@ -988,6 +999,7 @@ function ChannelGroup({
   getPrefix,
   isUnread,
   isMuted,
+  hasMention,
   onSelect,
   onContextMenu,
   onMiddleClick,
@@ -1012,7 +1024,7 @@ function ChannelGroup({
         >
           <span className="channel-prefix">{getPrefix(ch)}</span>
           <span className="channel-name">{getDisplayName(ch)}</span>
-          {ch.mention_count > 0 && !isMuted(ch) && (
+          {hasMention(ch) && (
             <span className="mention-badge">{ch.mention_count}</span>
           )}
         </button>

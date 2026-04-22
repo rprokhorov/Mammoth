@@ -74,7 +74,10 @@ export function useWebSocket() {
           handleStatusChange(data);
           break;
         case "channel_viewed":
-          handleChannelViewed(data);
+          handleChannelViewed(data, broadcast);
+          break;
+        case "multiple_channels_viewed":
+          handleMultipleChannelsViewed(data);
           break;
         case "thread_updated":
           handleThreadUpdated(data);
@@ -107,6 +110,22 @@ export function useWebSocket() {
       unlistenEvent.then((fn) => fn());
     };
   }, [activeServerId]);
+}
+
+function isMentioned(
+  post: PostData,
+  _channel: { mark_unread?: string },
+  _channelId: string,
+): boolean {
+  if (post.post_type && post.post_type.startsWith("system_")) return false;
+  const { currentUserId, users } = useUiStore.getState();
+  if (!currentUserId) return false;
+  const currentUser = users[currentUserId];
+  const username = currentUser?.username ?? "";
+  const msg = post.message.toLowerCase();
+  const mentionedExplicitly = username ? msg.includes(`@${username}`) : false;
+  const mentionedAll = msg.includes("@channel") || msg.includes("@all") || msg.includes("@here");
+  return mentionedExplicitly || mentionedAll;
 }
 
 function shouldNotify(
@@ -186,21 +205,19 @@ function handlePosted(
 
   // Update unread badge for non-active channels (only for top-level posts, not thread replies)
   const isThreadReply = post?.root_id;
-  const { channels, activeChannelId, updateChannelMentions, users } =
+  const isSystemMessage = post?.post_type && post.post_type.startsWith("system_");
+  const { channels, activeChannelId, users } =
     useUiStore.getState();
 
-  // Update tab unread badge for non-active tabs (top-level posts only)
-  if (!isThreadReply) {
+  // Update tab unread badge for non-active tabs (top-level, non-system posts only)
+  if (!isThreadReply && !isSystemMessage) {
     useTabsStore.getState().incrementTabUnread(channelId);
   }
 
   const channel = channels.find((ch) => ch.id === channelId);
-  if (channel && channelId !== activeChannelId && !isThreadReply) {
-    updateChannelMentions(
-      channelId,
-      channel.mention_count + 1,
-      channel.msg_count,
-    );
+  if (channel && channelId !== activeChannelId && !isThreadReply && !isSystemMessage) {
+    const hasMention = post ? isMentioned(post, channel, channelId) : false;
+    useUiStore.getState().incrementChannelUnread(channelId, hasMention);
 
     // Send desktop notification for messages in non-active channels
     if (notifPermission && post && shouldNotify(post, channel, channelId)) {
@@ -323,12 +340,58 @@ function handleThreadUpdated(data: Record<string, unknown>) {
   }
 }
 
-function handleChannelViewed(data: Record<string, unknown>) {
-  const channelId = data.channel_id as string;
+function handleChannelViewed(
+  data: Record<string, unknown>,
+  broadcast: { channel_id: string },
+) {
+  // Mattermost sends channel_id in data; some versions use broadcast.channel_id
+  const channelId = (data.channel_id as string | undefined) || broadcast.channel_id;
   if (!channelId) return;
 
-  const { updateChannelMentions } = useUiStore.getState();
-  updateChannelMentions(channelId, 0, 0);
+  // Skip if this is the currently active channel — we already cleared it locally
+  const { activeChannelId, activeServerId } = useUiStore.getState();
+  if (channelId === activeChannelId) return;
+
+  // Optimistically clear unread, then fetch authoritative counts from server
+  useUiStore.getState().clearChannelUnread(channelId);
+  updateBadgeCount();
+
+  // Sync authoritative msg_count/mention_count from server
+  if (activeServerId) {
+    invoke<{ msg_count: number; mention_count: number }>("get_channel_member", {
+      serverId: activeServerId,
+      channelId,
+    }).then((member) => {
+      useUiStore.getState().updateChannelMentions(channelId, member.mention_count, member.msg_count);
+      updateBadgeCount();
+    }).catch(() => {});
+  }
+}
+
+function handleMultipleChannelsViewed(data: Record<string, unknown>) {
+  // data.channel_times: { [channelId]: timestampMs }
+  const channelTimes = data.channel_times as Record<string, number> | undefined;
+  if (!channelTimes) return;
+
+  const { activeChannelId, activeServerId } = useUiStore.getState();
+
+  for (const channelId of Object.keys(channelTimes)) {
+    // Skip currently active channel — already cleared locally
+    if (channelId === activeChannelId) continue;
+
+    useUiStore.getState().clearChannelUnread(channelId);
+
+    // Fetch authoritative counts from server
+    if (activeServerId) {
+      invoke<{ msg_count: number; mention_count: number }>("get_channel_member", {
+        serverId: activeServerId,
+        channelId,
+      }).then((member) => {
+        useUiStore.getState().updateChannelMentions(channelId, member.mention_count, member.msg_count);
+      }).catch(() => {});
+    }
+  }
+
   updateBadgeCount();
 }
 

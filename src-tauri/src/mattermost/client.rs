@@ -1287,6 +1287,18 @@ impl MattermostClient {
         Ok(())
     }
 
+    pub async fn get_channel_member_info(
+        &self,
+        channel_id: &str,
+        user_id: &str,
+    ) -> Result<ChannelMember, AppError> {
+        let resp = self
+            .get_authenticated(&format!("/channels/{}/members/{}", channel_id, user_id))
+            .await?;
+        let member: ChannelMember = resp.json().await?;
+        Ok(member)
+    }
+
     pub async fn get_channel_member_last_viewed(
         &self,
         channel_id: &str,

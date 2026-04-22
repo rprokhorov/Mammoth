@@ -78,6 +78,37 @@ pub struct ChannelWithMeta {
     pub mark_unread: String,
 }
 
+impl ChannelWithMeta {
+    pub fn from_channel_and_member(ch: Channel, member: Option<&ChannelMember>) -> Self {
+        let mark_unread = member
+            .and_then(|m| m.notify_props.as_ref())
+            .map(|np| np.mark_unread.clone())
+            .unwrap_or_default();
+
+        // Prefer *_root counts (excludes system messages) if available (Mattermost 6+)
+        let total_msg_count = if ch.total_msg_count_root > 0 {
+            ch.total_msg_count_root
+        } else {
+            ch.total_msg_count
+        };
+        let msg_count = member.map_or(0, |m| {
+            if m.msg_count_root > 0 { m.msg_count_root } else { m.msg_count }
+        });
+
+        // Patch channel's total_msg_count to use the root value we've chosen
+        let mut channel = ch;
+        channel.total_msg_count = total_msg_count;
+
+        ChannelWithMeta {
+            channel,
+            msg_count,
+            mention_count: member.map_or(0, |m| m.mention_count),
+            last_viewed_at: member.map_or(0, |m| m.last_viewed_at),
+            mark_unread,
+        }
+    }
+}
+
 #[tauri::command]
 pub async fn get_channels_for_team(
     state: State<'_, AppState>,
@@ -113,18 +144,8 @@ pub async fn get_channels_for_team(
     let result: Vec<ChannelWithMeta> = channels
         .into_iter()
         .map(|ch| {
-            let member = member_map.get(&ch.id);
-            let mark_unread = member
-                .and_then(|m| m.notify_props.as_ref())
-                .map(|np| np.mark_unread.clone())
-                .unwrap_or_default();
-            ChannelWithMeta {
-                msg_count: member.map_or(0, |m| m.msg_count),
-                mention_count: member.map_or(0, |m| m.mention_count),
-                last_viewed_at: member.map_or(0, |m| m.last_viewed_at),
-                mark_unread,
-                channel: ch,
-            }
+            let member = member_map.get(&ch.id).map(|m| m as &ChannelMember);
+            ChannelWithMeta::from_channel_and_member(ch, member)
         })
         .collect();
 
@@ -190,6 +211,28 @@ pub async fn view_channel(
     };
 
     client.view_channel(&user_id, &channel_id).await
+}
+
+#[tauri::command]
+pub async fn get_channel_member(
+    state: State<'_, AppState>,
+    server_id: String,
+    channel_id: String,
+) -> Result<ChannelMember, AppError> {
+    let (client, user_id) = {
+        let servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let server = servers
+            .get(&server_id)
+            .ok_or_else(|| AppError::NotFound(format!("Server {} not found", server_id)))?;
+        let user_id = server
+            .current_user
+            .as_ref()
+            .map(|u| u.id.clone())
+            .ok_or_else(|| AppError::Auth("Not logged in".into()))?;
+        (server.client.clone(), user_id)
+    };
+
+    client.get_channel_member_info(&channel_id, &user_id).await
 }
 
 #[tauri::command]

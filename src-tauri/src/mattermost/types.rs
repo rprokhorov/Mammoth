@@ -68,6 +68,9 @@ pub struct Channel {
     pub delete_at: i64,
     #[serde(default)]
     pub total_msg_count: i64,
+    /// Only root (non-system) posts — available in Mattermost 6+. Zero on older servers.
+    #[serde(default)]
+    pub total_msg_count_root: i64,
     #[serde(default)]
     pub last_post_at: i64,
 }
@@ -88,6 +91,9 @@ pub struct ChannelMember {
     pub last_viewed_at: i64,
     #[serde(default)]
     pub msg_count: i64,
+    /// Only root (non-system) posts — available in Mattermost 6+. Zero on older servers.
+    #[serde(default)]
+    pub msg_count_root: i64,
     #[serde(default)]
     pub mention_count: i64,
     #[serde(default)]

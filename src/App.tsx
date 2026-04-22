@@ -292,7 +292,7 @@ function AppContent() {
               const uiStore = useUiStore.getState();
               uiStore.setActiveChannelId(newTab.channelId);
               uiStore.setMainSubView("channels");
-              uiStore.updateChannelMentions(newTab.channelId, 0, 0);
+              uiStore.clearChannelUnread(newTab.channelId);
             }
           }
         }
@@ -309,7 +309,7 @@ function AppContent() {
           const uiStore = useUiStore.getState();
           uiStore.setActiveChannelId(tab.channelId);
           uiStore.setMainSubView("channels");
-          uiStore.updateChannelMentions(tab.channelId, 0, 0);
+          uiStore.clearChannelUnread(tab.channelId);
           if (uiStore.activeServerId) {
             invoke("view_channel", {
               serverId: uiStore.activeServerId,
@@ -705,7 +705,7 @@ function AppContent() {
     tabStore.navigateDefaultTab(channelId);
     tabStore.clearTabUnread(channelId);
     // Clear unread badge immediately on the client side
-    store.updateChannelMentions(channelId, 0, 0);
+    store.clearChannelUnread(channelId);
     // Also update badge count
     const totalMentions = store.channels.reduce(
       (sum, ch) => sum + (ch.id === channelId ? 0 : ch.mention_count),

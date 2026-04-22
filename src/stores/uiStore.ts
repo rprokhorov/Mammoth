@@ -105,7 +105,9 @@ interface UiState {
   setChannels: (channels: ChannelInfo[]) => void;
   setActiveChannelId: (id: string | null) => void;
   updateChannelMentions: (channelId: string, mentionCount: number, msgCount: number) => void;
+  clearChannelUnread: (channelId: string) => void;
   updateChannelMarkUnread: (channelId: string, markUnread: string) => void;
+  incrementChannelUnread: (channelId: string, hasMention: boolean) => void;
 
   // User actions
   setUsers: (users: UserInfo[]) => void;
@@ -191,10 +193,30 @@ export const useUiStore = create<UiState>((set) => ({
           : ch,
       ),
     })),
+  clearChannelUnread: (channelId) =>
+    set((state) => ({
+      channels: state.channels.map((ch) =>
+        ch.id === channelId
+          ? { ...ch, mention_count: 0, msg_count: ch.total_msg_count, last_viewed_at: Date.now() }
+          : ch,
+      ),
+    })),
   updateChannelMarkUnread: (channelId, markUnread) =>
     set((state) => ({
       channels: state.channels.map((ch) =>
         ch.id === channelId ? { ...ch, mark_unread: markUnread } : ch,
+      ),
+    })),
+  incrementChannelUnread: (channelId, hasMention) =>
+    set((state) => ({
+      channels: state.channels.map((ch) =>
+        ch.id === channelId
+          ? {
+              ...ch,
+              total_msg_count: ch.total_msg_count + 1,
+              mention_count: hasMention ? ch.mention_count + 1 : ch.mention_count,
+            }
+          : ch,
       ),
     })),
 
