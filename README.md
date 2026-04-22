@@ -2,7 +2,7 @@
 
 Cross-platform desktop client for Mattermost, built with **Tauri 2** (Rust backend) + **React + TypeScript** frontend.
 
-See [BUILDING.md](BUILDING.md) for build and dev setup instructions.
+See [BUILDING.md](BUILDING.md) for build, dev setup, and release instructions.
 
 ---
 
