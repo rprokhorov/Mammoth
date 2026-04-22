@@ -3913,7 +3913,7 @@ pre.code-block.mermaid-code {
   display: grid;
   grid-template-columns: repeat(8, 1fr);
   padding: 8px;
-  max-height: 240px;
+  max-height: 180px;
   overflow-y: auto;
 }
 .emoji-btn {

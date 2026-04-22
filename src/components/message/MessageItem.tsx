@@ -39,7 +39,7 @@ export const MessageItem = memo(function MessageItem({
   const [showPopover, setShowPopover] = useState(false);
   const [participantPopover, setParticipantPopover] = useState<{ userId: string; anchor: HTMLElement } | null>(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const [emojiPickerStyle, setEmojiPickerStyle] = useState<React.CSSProperties>({});
+  const [emojiPickerPos, setEmojiPickerPos] = useState<React.CSSProperties>({});
   const [followLoading, setFollowLoading] = useState(false);
   const userThreads = useThreadsStore((s) => s.userThreads);
   const cachedParticipants = useThreadsStore((s) => s.threadParticipants[post.id]);
@@ -300,21 +300,45 @@ export const MessageItem = memo(function MessageItem({
             ref={reactionBtnRef}
             className="message-action-btn"
             onClick={() => {
-              if (!showEmojiPicker && reactionBtnRef.current) {
+              if (showEmojiPicker) {
+                setShowEmojiPicker(false);
+                return;
+              }
+              if (reactionBtnRef.current) {
                 const rect = reactionBtnRef.current.getBoundingClientRect();
-                const pickerHeight = 360;
-                if (rect.top >= pickerHeight) {
-                  setEmojiPickerStyle({ bottom: "calc(100% + 6px)", top: "auto", right: 0 });
+                const pickerWidth = 320;
+                const pickerHeight = 250;
+                const gapBelow = 4;
+                const gapAbove = 4;
+                // .message-actions has top: -8px, so visible top of toolbar is 8px above rect.top
+                const toolbarOffset = 8;
+                const vw = window.innerWidth;
+                const vh = window.innerHeight;
+
+                // vertical: prefer above (bottom of picker = top of button), fall back to below
+                let top: number;
+                const visibleTop = rect.top - toolbarOffset;
+                const fitsBelow = rect.bottom + gapBelow + pickerHeight <= vh - 8;
+                if (fitsBelow) {
+                  top = rect.bottom + gapBelow;
                 } else {
-                  setEmojiPickerStyle({ top: "calc(100% + 6px)", bottom: "auto", right: 0 });
+                  top = visibleTop - pickerHeight - gapAbove;
                 }
+                // clamp vertically
+                top = Math.max(8, Math.min(top, vh - pickerHeight - 8));
+
+                // horizontal: align right edge with button right edge, clamp to viewport
+                let left = rect.right - pickerWidth;
+                left = Math.max(8, Math.min(left, vw - pickerWidth - 8));
+
+                setEmojiPickerPos({ position: "fixed", top, left, zIndex: 1100 });
               }
               setShowEmojiPicker(true);
             }}
             title="Add reaction"
             aria-label="Add reaction"
           >
-            +
+            ☺
           </button>
           <button
             className="message-action-btn"
@@ -360,10 +384,11 @@ export const MessageItem = memo(function MessageItem({
 
         {/* Emoji picker */}
         {showEmojiPicker && (
-          <div className="emoji-picker-anchor" style={emojiPickerStyle}>
+          <div style={emojiPickerPos}>
             <EmojiPicker
               onSelect={handleAddReaction}
               onClose={() => setShowEmojiPicker(false)}
+              triggerRef={reactionBtnRef}
             />
           </div>
         )}
