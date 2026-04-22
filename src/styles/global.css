@@ -2028,7 +2028,6 @@ pre.code-block.mermaid-code {
   flex-shrink: 0;
   background: var(--bg-primary);
   min-width: 0;
-  overflow: hidden;
 }
 
 .thread-panel-header {

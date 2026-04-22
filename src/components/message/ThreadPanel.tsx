@@ -1,30 +1,12 @@
 import { useEffect, useRef, useState, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { open } from "@tauri-apps/plugin-dialog";
-import { useTauriDragDrop } from "@/hooks/useTauriDragDrop";
 import { useThreadsStore } from "@/stores/threadsStore";
 import { useMessagesStore, type PostData } from "@/stores/messagesStore";
 import { useUiStore } from "@/stores/uiStore";
 import { useTabsStore } from "@/stores/tabsStore";
 import { primeLastViewedSnapshot } from "@/stores/lastViewedSnapshot";
 import { MessageItem } from "./MessageItem";
-import { EmojiPicker, EMOJI_MAP } from "./EmojiPicker";
-import { MarkdownToolbar, handleMarkdownShortcut } from "./MarkdownToolbar";
-
-interface AttachedFile {
-  path: string;
-  name: string;
-  previewUrl?: string;
-  uploading: boolean;
-  fileId?: string;
-  error?: string;
-}
-
-interface FileUploadResult {
-  file_infos: Array<{ id: string }>;
-}
-
-const IMAGE_EXTS = ["png", "jpg", "jpeg", "gif", "bmp", "webp"];
+import { MessageComposer } from "./MessageComposer";
 
 interface PostsResponse {
   order: string[];
@@ -57,23 +39,13 @@ export function ThreadPanel({ serverId, currentUserId, width }: ThreadPanelProps
   );
   const [followLoading, setFollowLoading] = useState(false);
 
-  const [text, setText] = useState("");
-  const [sending, setSending] = useState(false);
-  const [attachments, setAttachments] = useState<AttachedFile[]>([]);
-  const [isDragging, setIsDragging] = useState(false);
-  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const [emojiPickerStyle, setEmojiPickerStyle] = useState<React.CSSProperties>({});
   const [editingPostId, setEditingPostId] = useState<string | null>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const emojiTriggerRef = useRef<HTMLButtonElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
-  const composerRef = useRef<HTMLDivElement>(null);
   const panelBodyRef = useRef<HTMLDivElement>(null);
 
   // Reset edit state when thread changes
   useEffect(() => {
     setEditingPostId(null);
-    setText("");
   }, [activeThreadId]);
 
   // Load thread when activeThreadId changes and mark as read
@@ -195,203 +167,18 @@ export function ThreadPanel({ serverId, currentUserId, width }: ThreadPanelProps
     return () => clearTimeout(timer);
   }, [scrollToThreadPostId, order]);
 
-  useTauriDragDrop(
-    composerRef,
-    (paths) => {
-      const rp = threadPosts[activeThreadId!] || useMessagesStore.getState().posts[activeThreadId!];
-      if (!rp) return;
-      addFiles(paths.map((p) => ({ path: p, name: p.split(/[\\/]/).pop() ?? p })), rp.channel_id);
-    },
-    setIsDragging,
-    !!activeThreadId,
-  );
-
   if (!activeThreadId) return null;
 
   const rootPost = threadPosts[activeThreadId] || useMessagesStore.getState().posts[activeThreadId];
-
-  async function uploadFile(path: string, name: string, channelId: string): Promise<string | undefined> {
-    try {
-      const result = await invoke<FileUploadResult>("upload_file", {
-        serverId,
-        channelId,
-        filePath: path,
-        fileName: name,
-      });
-      return result.file_infos[0]?.id;
-    } catch (e) {
-      console.error("Upload failed:", e);
-      return undefined;
-    }
-  }
-
-  async function addFiles(files: Array<{ path: string; name: string }>, channelId: string) {
-    const newAttachments: AttachedFile[] = files.map((f) => ({ path: f.path, name: f.name, uploading: true }));
-    setAttachments((prev) => [...prev, ...newAttachments]);
-
-    for (const file of files) {
-      const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
-      const isImage = IMAGE_EXTS.includes(ext);
-
-      let previewUrl: string | undefined;
-      if (isImage) {
-        try {
-          const mimeType = ext === "jpg" ? "image/jpeg" : `image/${ext}`;
-          const data = await invoke<{ data_url: string }>("read_local_file_as_data_url", { filePath: file.path, mimeType });
-          previewUrl = data.data_url;
-        } catch { /* preview not critical */ }
-      }
-
-      const fileId = await uploadFile(file.path, file.name, channelId);
-      setAttachments((prev) =>
-        prev.map((a) => a.path === file.path
-          ? { ...a, uploading: false, fileId, previewUrl, error: fileId ? undefined : "Upload failed" }
-          : a
-        )
-      );
-    }
-  }
-
-  async function handleAttachClick() {
-    const rootPost = threadPosts[activeThreadId!] || useMessagesStore.getState().posts[activeThreadId!];
-    if (!rootPost) return;
-    try {
-      const selected = await open({ multiple: true });
-      if (!selected) return;
-      const paths = Array.isArray(selected) ? selected : [selected];
-      await addFiles(paths.map((p) => ({ path: p, name: p.split("/").pop() ?? p })), rootPost.channel_id);
-    } catch (e) {
-      console.error("File picker error:", e);
-    }
-  }
-
-  async function handlePaste(e: React.ClipboardEvent) {
-    const items = Array.from(e.clipboardData.items);
-    const imageItems = items.filter((item) => item.type.startsWith("image/"));
-    if (imageItems.length === 0) return;
-    const rootPost = threadPosts[activeThreadId!] || useMessagesStore.getState().posts[activeThreadId!];
-    if (!rootPost) return;
-
-    e.preventDefault();
-    for (const item of imageItems) {
-      const file = item.getAsFile();
-      if (!file) continue;
-      try {
-        const ext = item.type.split("/")[1] ?? "png";
-        const tmpName = `clipboard_${Date.now()}.${ext}`;
-        const dataBase64 = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve((reader.result as string).split(",")[1] ?? "");
-          reader.onerror = reject;
-          reader.readAsDataURL(file);
-        });
-        const tmpPath = await invoke<string>("save_temp_file", { fileName: tmpName, dataBase64 });
-        await addFiles([{ path: tmpPath, name: tmpName }], rootPost.channel_id);
-      } catch { /* ignore */ }
-    }
-  }
-
-  function removeAttachment(path: string) {
-    setAttachments((prev) => prev.filter((a) => a.path !== path));
-  }
 
   function handleEditPost(postId: string) {
     const post = threadPosts[postId] || useMessagesStore.getState().posts[postId];
     if (!post) return;
     setEditingPostId(postId);
-    setText(post.message);
-    requestAnimationFrame(() => {
-      textareaRef.current?.focus();
-    });
   }
 
   function cancelEdit() {
     setEditingPostId(null);
-    setText("");
-    if (textareaRef.current) textareaRef.current.style.height = "auto";
-  }
-
-  async function handleSend() {
-    const trimmed = text.trim();
-    const readyFileIds = attachments.filter((a) => a.fileId).map((a) => a.fileId!);
-    if ((!trimmed && readyFileIds.length === 0) || sending || !activeThreadId) return;
-    if (attachments.some((a) => a.uploading)) return;
-
-    setSending(true);
-    try {
-      if (editingPostId) {
-        const updated = await invoke<PostData>("edit_post", {
-          serverId,
-          postId: editingPostId,
-          message: trimmed,
-        });
-        useThreadsStore.getState().updateThreadPost(updated);
-        useMessagesStore.getState().updatePost(updated);
-        setEditingPostId(null);
-      } else {
-        const rootPost = threadPosts[activeThreadId!] || useMessagesStore.getState().posts[activeThreadId!];
-        const newPost = await invoke<PostData>("send_post", {
-          serverId,
-          channelId: rootPost?.channel_id ?? "",
-          message: trimmed,
-          rootId: activeThreadId,
-          fileIds: readyFileIds.length > 0 ? readyFileIds : undefined,
-        });
-        useThreadsStore.getState().addThreadReply(newPost);
-        useMessagesStore.getState().addPost(newPost);
-      }
-      setText("");
-      setAttachments([]);
-      if (textareaRef.current) textareaRef.current.style.height = "auto";
-    } catch (e) {
-      console.error("Failed to send reply:", e);
-    } finally {
-      setSending(false);
-    }
-  }
-
-  function insertEmojiFromPicker(emojiName: string) {
-    const ta = textareaRef.current;
-    const unicode = EMOJI_MAP[emojiName] || `:${emojiName}: `;
-    const cursor = ta ? ta.selectionStart : text.length;
-    const before = text.slice(0, cursor);
-    const after = text.slice(cursor);
-    const newText = before + unicode + after;
-    handleTextChange(newText);
-    setShowEmojiPicker(false);
-    requestAnimationFrame(() => {
-      if (ta) {
-        const newCursor = cursor + unicode.length;
-        ta.setSelectionRange(newCursor, newCursor);
-        ta.focus();
-      }
-    });
-  }
-
-  function handleKeyDown(e: React.KeyboardEvent) {
-    if (handleMarkdownShortcut(e, textareaRef, text, handleTextChange)) return;
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
-    }
-    if (e.key === "Escape") {
-      if (editingPostId) {
-        cancelEdit();
-      } else {
-        useThreadsStore.getState().clearThread();
-      }
-    }
-    if (e.key === "ArrowUp" && !text && !editingPostId && activeThreadId) {
-      const threadOrder = useThreadsStore.getState().threadOrder[activeThreadId] || [];
-      const allThreadPosts = useThreadsStore.getState().threadPosts;
-      const lastOwnPost = [...threadOrder].reverse().map((id) => allThreadPosts[id]).find(
-        (p) => p && p.user_id === currentUserId && !p.post_type && !p.delete_at
-      );
-      if (lastOwnPost) {
-        e.preventDefault();
-        handleEditPost(lastOwnPost.id);
-      }
-    }
   }
 
   async function handleToggleFollow() {
@@ -430,16 +217,6 @@ export function ThreadPanel({ serverId, currentUserId, width }: ThreadPanelProps
     tabStore.navigateDefaultTab(rootPost.channel_id);
   }
 
-  // Adjust textarea height
-  function handleTextChange(value: string) {
-    setText(value);
-    const ta = textareaRef.current;
-    if (ta) {
-      ta.style.height = "auto";
-      ta.style.height = Math.min(ta.scrollHeight, 440) + "px";
-    }
-  }
-
   // Count replies (all posts except root)
   const replyCount = order.filter((id) => id !== activeThreadId).length;
 
@@ -470,8 +247,6 @@ export function ThreadPanel({ serverId, currentUserId, width }: ThreadPanelProps
     const ch = useUiStore.getState().channels.find((c) => c.id === rootPost.channel_id);
     return ch?.channel_type === "D" || ch?.channel_type === "G";
   }, [rootPost]);
-
-  const canSend = (text.trim().length > 0 || attachments.some((a) => a.fileId)) && !sending && !attachments.some((a) => a.uploading);
 
   return (
     <div
@@ -557,109 +332,20 @@ export function ThreadPanel({ serverId, currentUserId, width }: ThreadPanelProps
         )}
       </div>
 
-      <div
-        ref={composerRef}
-        className={`thread-panel-composer ${isDragging ? "drag-over" : ""}`}
-      >
-        {editingPostId && (
-          <div className="composer-edit-banner">
-            Editing message
-            <button className="cancel-edit" onClick={cancelEdit}>Cancel</button>
-          </div>
-        )}
-        {isDragging && <div className="composer-drop-hint">Drop files to attach</div>}
-        {attachments.length > 0 && (
-          <div className="composer-attachments">
-            {attachments.map((att) => {
-              const ext = att.name.split(".").pop()?.toLowerCase() ?? "";
-              const isImage = IMAGE_EXTS.includes(ext);
-              return (
-                <div key={att.path} className={`composer-attachment ${att.error ? "error" : ""}`}>
-                  {isImage && att.previewUrl ? (
-                    <img src={att.previewUrl} alt={att.name} className="composer-attachment-thumb" />
-                  ) : (
-                    <span className="composer-attachment-icon">📄</span>
-                  )}
-                  <span className="composer-attachment-name">{att.name}</span>
-                  {att.uploading && <span className="composer-attachment-status">⏳</span>}
-                  {att.error && <span className="composer-attachment-status error">✗</span>}
-                  {att.fileId && <span className="composer-attachment-status ok">✓</span>}
-                  <button className="composer-attachment-remove" onClick={() => removeAttachment(att.path)} title="Remove">✕</button>
-                </div>
-              );
-            })}
-          </div>
-        )}
-        <MarkdownToolbar
-          textareaRef={textareaRef}
-          text={text}
-          setText={handleTextChange}
-          disabled={sending}
-        />
-        <div className="composer-input-row">
-          <button
-            className="composer-attach-btn"
-            onClick={handleAttachClick}
-            title="Attach file"
-            disabled={sending}
-          >
-            📎
-          </button>
-          <textarea
-            ref={textareaRef}
-            className="composer-textarea"
-            value={text}
-            onChange={(e) => handleTextChange(e.target.value)}
-            onKeyDown={handleKeyDown}
-            onPaste={handlePaste}
-            placeholder="Reply..."
-            rows={1}
-            disabled={sending}
-          />
-          <div className="composer-emoji-wrap">
-            <button
-              ref={emojiTriggerRef}
-              className="composer-emoji-btn"
-              onClick={() => {
-                setShowEmojiPicker((v) => {
-                  if (!v && emojiTriggerRef.current) {
-                    const rect = emojiTriggerRef.current.getBoundingClientRect();
-                    const pickerHeight = 360;
-                    const spaceAbove = rect.top;
-                    if (spaceAbove >= pickerHeight) {
-                      setEmojiPickerStyle({ bottom: "calc(100% + 6px)", top: "auto", right: 0 });
-                    } else {
-                      setEmojiPickerStyle({ top: "calc(100% + 6px)", bottom: "auto", right: 0 });
-                    }
-                  }
-                  return !v;
-                });
-              }}
-              title="Emoji"
-              disabled={sending}
-            >
-              😊
-            </button>
-            {showEmojiPicker && (
-              <div className="composer-emoji-popup" style={emojiPickerStyle}>
-                <EmojiPicker
-                  onSelect={insertEmojiFromPicker}
-                  onClose={() => setShowEmojiPicker(false)}
-                  triggerRef={emojiTriggerRef}
-                />
-              </div>
-            )}
-          </div>
-          <button
-            className="composer-send-btn"
-            onClick={handleSend}
-            disabled={!canSend}
-            title="Send reply"
-          >
-            ➤
-          </button>
-        </div>
-      </div>
+      <MessageComposer
+        channelId={rootPost?.channel_id ?? ""}
+        serverId={serverId}
+        rootId={activeThreadId}
+        externalEditingPostId={editingPostId}
+        onCancelExternalEdit={cancelEdit}
+        onEditRequest={(postId) => handleEditPost(postId)}
+        onReplySent={() => {
+          requestAnimationFrame(() => {
+            bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+          });
+        }}
+        placeholder="Reply..."
+      />
     </div>
   );
 }

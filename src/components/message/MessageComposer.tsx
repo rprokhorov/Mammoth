@@ -11,6 +11,16 @@ import { UserAvatar } from "@/components/common/UserAvatar";
 interface MessageComposerProps {
   channelId: string;
   serverId: string;
+  /** When set, replies are sent as thread replies with this root post ID */
+  rootId?: string;
+  /** External editing post id (for thread panel to set edit from MessageItem) */
+  externalEditingPostId?: string | null;
+  onCancelExternalEdit?: () => void;
+  /** Callback when reply is sent (for thread panel to scroll etc.) */
+  onReplySent?: (post: PostData) => void;
+  /** Called when ArrowUp is pressed in empty thread composer — parent should start editing the given post */
+  onEditRequest?: (postId: string, message: string) => void;
+  placeholder?: string;
 }
 
 interface AttachedFile {
@@ -57,7 +67,7 @@ function getDisplayName(u: MentionUser): string {
 const IMAGE_EXTS = ["png", "jpg", "jpeg", "gif", "bmp", "webp"];
 const ALL_EMOJI_NAMES = Object.keys(EMOJI_MAP);
 
-export function MessageComposer({ channelId, serverId }: MessageComposerProps) {
+export function MessageComposer({ channelId, serverId, rootId, externalEditingPostId, onCancelExternalEdit, onReplySent, onEditRequest, placeholder }: MessageComposerProps) {
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [attachments, setAttachments] = useState<AttachedFile[]>([]);
@@ -87,7 +97,9 @@ export function MessageComposer({ channelId, serverId }: MessageComposerProps) {
   const activeTeamId = useUiStore((s) => s.activeTeamId);
   const allChannels = useUiStore((s) => s.channels);
 
-  const editingPostId = useMessagesStore((s) => s.editingPostId);
+  // For channel composer: editing is tracked in the global messagesStore
+  // For thread composer (rootId set): editing is tracked via externalEditingPostId prop
+  const storeEditingPostId = useMessagesStore((s) => s.editingPostId);
   const posts = useMessagesStore((s) => s.posts);
   const orderByChannel = useMessagesStore((s) => s.orderByChannel);
   const setEditingPostId = useMessagesStore((s) => s.setEditingPostId);
@@ -95,6 +107,8 @@ export function MessageComposer({ channelId, serverId }: MessageComposerProps) {
   const addPost = useMessagesStore((s) => s.addPost);
   const currentUserId = useUiStore((s) => s.currentUserId);
 
+  // Effective editing post id: external (thread) takes priority over store (channel)
+  const editingPostId = rootId ? externalEditingPostId ?? null : storeEditingPostId;
   const editingPost = editingPostId ? posts[editingPostId] : null;
 
   useEffect(() => {
@@ -107,9 +121,9 @@ export function MessageComposer({ channelId, serverId }: MessageComposerProps) {
   useEffect(() => {
     setText("");
     setAttachments([]);
-    setEditingPostId(null);
+    if (!rootId) setEditingPostId(null);
     textareaRef.current?.focus();
-  }, [channelId]);
+  }, [channelId, rootId]);
 
   useTauriDragDrop(
     composerRef,
@@ -437,8 +451,17 @@ export function MessageComposer({ channelId, serverId }: MessageComposerProps) {
           message: trimmed,
         });
         updatePost(updated);
-        setEditingPostId(null);
-      } else if (trimmed.startsWith("/") && readyFileIds.length === 0) {
+        if (rootId) {
+          // Thread edit: notify parent to clear external editing state
+          onCancelExternalEdit?.();
+          // Also update in threads store
+          const { useThreadsStore } = await import("@/stores/threadsStore");
+          useThreadsStore.getState().updateThreadPost(updated);
+        } else {
+          setEditingPostId(null);
+        }
+      } else if (trimmed.startsWith("/") && readyFileIds.length === 0 && !rootId) {
+        // Slash commands only supported in channel composer, not thread
         await invoke("execute_slash_command", {
           serverId,
           channelId,
@@ -450,9 +473,18 @@ export function MessageComposer({ channelId, serverId }: MessageComposerProps) {
           serverId,
           channelId,
           message: trimmed,
+          ...(rootId ? { rootId } : {}),
           fileIds: readyFileIds.length > 0 ? readyFileIds : undefined,
         });
-        addPost(newPost);
+        if (rootId) {
+          // Thread reply: update threads store + channel store
+          const { useThreadsStore } = await import("@/stores/threadsStore");
+          useThreadsStore.getState().addThreadReply(newPost);
+          addPost(newPost);
+          onReplySent?.(newPost);
+        } else {
+          addPost(newPost);
+        }
       }
       setText("");
       setAttachments([]);
@@ -510,19 +542,38 @@ export function MessageComposer({ channelId, serverId }: MessageComposerProps) {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
     if (e.key === "Escape" && editingPostId) { cancelEdit(); }
     if (e.key === "ArrowUp" && !text && !editingPostId) {
-      const order = orderByChannel[channelId] || [];
-      const lastOwnPost = order.map((id) => posts[id]).find(
-        (p) => p && p.user_id === currentUserId && !p.post_type && !p.delete_at && !p.root_id && p.message.trim()
-      );
-      if (lastOwnPost) {
-        e.preventDefault();
-        setEditingPostId(lastOwnPost.id);
+      if (rootId) {
+        // Thread mode: delegate to parent via onEditRequest
+        import("@/stores/threadsStore").then(({ useThreadsStore }) => {
+          const threadOrder = useThreadsStore.getState().threadOrder[rootId] || [];
+          const threadPosts = useThreadsStore.getState().threadPosts;
+          const lastOwnPost = [...threadOrder].reverse().map((id) => threadPosts[id]).find(
+            (p) => p && p.user_id === currentUserId && !p.post_type && !p.delete_at && p.message.trim()
+          );
+          if (lastOwnPost) {
+            e.preventDefault();
+            onEditRequest?.(lastOwnPost.id, lastOwnPost.message);
+          }
+        });
+      } else {
+        const order = orderByChannel[channelId] || [];
+        const lastOwnPost = order.map((id) => posts[id]).find(
+          (p) => p && p.user_id === currentUserId && !p.post_type && !p.delete_at && !p.root_id && p.message.trim()
+        );
+        if (lastOwnPost) {
+          e.preventDefault();
+          setEditingPostId(lastOwnPost.id);
+        }
       }
     }
   }
 
   function cancelEdit() {
-    setEditingPostId(null);
+    if (rootId) {
+      onCancelExternalEdit?.();
+    } else {
+      setEditingPostId(null);
+    }
     setText("");
     if (textareaRef.current) textareaRef.current.style.height = "auto";
     textareaRef.current?.focus();
@@ -691,7 +742,7 @@ export function MessageComposer({ channelId, serverId }: MessageComposerProps) {
           onChange={(e) => setText(e.target.value)}
           onKeyDown={handleKeyDown}
           onPaste={handlePaste}
-          placeholder="Write a message..."
+          placeholder={placeholder ?? "Write a message..."}
           rows={1}
           disabled={sending}
         />
