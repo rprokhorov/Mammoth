@@ -233,6 +233,7 @@ Implemented in one pass:
 | 114 | Исправлена логика unread: unread (жирный текст) = total_msg_count > msg_count; mention (бейдж с числом) = только явные @username/@channel/@all/@here; системные сообщения (join/leave) не влияют на unread; используются total_msg_count_root / msg_count_root (Mattermost 6+) чтобы исключить системные сообщения из подсчёта при загрузке | Готово | 3 |
 | 115 | Синхронизация unread между клиентами: обработка WS события multiple_channels_viewed (официальный клиент → наш клиент); view_channel API (наш → официальный); clearChannelUnread ставит msg_count = total_msg_count; get_channel_member для получения авторитетных счётчиков после внешнего viewed | Готово | 2 |
 | 116 | Исправлен @ mention, ~channel, :emoji: autocomplete в тредах: ThreadPanel заменил встроенный упрощённый composer на shared MessageComposer с rootId prop; убран overflow: hidden с .thread-panel (клипал выпадающие списки, открывающиеся вверх) | Готово | 1 |
+| 117 | Иконка кнопки "Add reaction" заменена с + на ☺; повторный клик закрывает пикер; пикер позиционируется через position:fixed с вычислением координат от viewport — открывается ниже кнопки если влезает, иначе выше; clamp по всем 4 краям экрана; тесты позиционирования (12 кейсов) в src/test/emojiPickerPosition.test.tsx | Готово | 6 |
 
 ---
 
