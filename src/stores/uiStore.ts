@@ -72,7 +72,7 @@ interface UiState {
   users: Record<string, UserInfo>;
 
   // Sub-view within main: "channels" or "threads"
-  mainSubView: "channels" | "threads" | "reactions";
+  mainSubView: "channels" | "threads" | "reactions" | "drafts";
 
   // User presence: userId -> "online" | "away" | "dnd" | "offline"
   userStatuses: Record<string, string>;

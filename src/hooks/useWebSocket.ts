@@ -10,6 +10,7 @@ import { useMessagesStore, type PostData } from "@/stores/messagesStore";
 import { useThreadsStore } from "@/stores/threadsStore";
 import { useTabsStore } from "@/stores/tabsStore";
 import { useReactionsStore } from "@/stores/reactionsStore";
+import { useDraftsStore } from "@/stores/draftsStore";
 
 interface WsStatusPayload {
   server_id: string;
@@ -99,6 +100,13 @@ export function useWebSocket() {
           break;
         case "channel_member_updated":
           handleChannelMemberUpdated(data);
+          break;
+        case "draft_created":
+        case "draft_updated":
+          handleDraftUpserted(data);
+          break;
+        case "draft_deleted":
+          handleDraftDeleted(data);
           break;
         default:
           console.log("WS event (unhandled):", eventType, JSON.stringify(data));
@@ -541,6 +549,77 @@ function handleChannelMemberUpdated(data: Record<string, unknown>) {
       // Sync full notify_props to cache (drives notification prefs panel)
       useUiStore.getState().updateChannelNotifyProps(member.channel_id, notifyProps);
     }
+  } catch {
+    // ignore parse errors
+  }
+}
+
+function handleDraftUpserted(data: Record<string, unknown>) {
+  try {
+    // Mattermost sends draft as a JSON string in data.draft
+    const draftStr = data.draft as string | undefined;
+    if (!draftStr) return;
+    const draft = JSON.parse(draftStr) as {
+      channel_id: string;
+      root_id?: string;
+      message: string;
+      update_at: number;
+    };
+    if (!draft.channel_id) return;
+
+    const channelId = draft.channel_id;
+    const rootId = draft.root_id ?? "";
+    const store = useDraftsStore.getState();
+    const existing = store.getDraft(channelId, rootId);
+
+    // Only apply if remote is newer than local
+    if (!existing || draft.update_at > existing.updateAt) {
+      // Bypass server sync — directly update local state without triggering upsert
+      const key = rootId ? `thread:${rootId}` : `channel:${channelId}`;
+      if (draft.message.trim()) {
+        useDraftsStore.setState((state) => ({
+          drafts: {
+            ...state.drafts,
+            [key]: {
+              message: draft.message,
+              channelId,
+              rootId,
+              updateAt: draft.update_at,
+            },
+          },
+        }));
+      } else {
+        useDraftsStore.setState((state) => {
+          const next = { ...state.drafts };
+          delete next[key];
+          return { drafts: next };
+        });
+      }
+    }
+  } catch {
+    // ignore parse errors
+  }
+}
+
+function handleDraftDeleted(data: Record<string, unknown>) {
+  try {
+    const draftStr = data.draft as string | undefined;
+    if (!draftStr) return;
+    const draft = JSON.parse(draftStr) as {
+      channel_id: string;
+      root_id?: string;
+    };
+    if (!draft.channel_id) return;
+
+    const channelId = draft.channel_id;
+    const rootId = draft.root_id ?? "";
+    const key = rootId ? `thread:${rootId}` : `channel:${channelId}`;
+
+    useDraftsStore.setState((state) => {
+      const next = { ...state.drafts };
+      delete next[key];
+      return { drafts: next };
+    });
   } catch {
     // ignore parse errors
   }

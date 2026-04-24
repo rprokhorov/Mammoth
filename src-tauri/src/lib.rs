@@ -251,6 +251,10 @@ pub fn run() {
             commands::create_sidebar_category,
             commands::update_sidebar_category,
             commands::delete_sidebar_category,
+            // Drafts
+            commands::get_drafts,
+            commands::upsert_draft,
+            commands::delete_draft,
             // Server utils
             commands::get_server_version,
             commands::clear_app_cache,

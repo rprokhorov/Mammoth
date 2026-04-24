@@ -4,6 +4,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { useTauriDragDrop } from "@/hooks/useTauriDragDrop";
 import { useMessagesStore, type PostData } from "@/stores/messagesStore";
 import { useUiStore } from "@/stores/uiStore";
+import { useDraftsStore } from "@/stores/draftsStore";
 import { EMOJI_MAP, EmojiPicker } from "./EmojiPicker";
 import { MarkdownToolbar, handleMarkdownShortcut } from "./MarkdownToolbar";
 import { UserAvatar } from "@/components/common/UserAvatar";
@@ -107,6 +108,10 @@ export function MessageComposer({ channelId, serverId, rootId, externalEditingPo
   const addPost = useMessagesStore((s) => s.addPost);
   const currentUserId = useUiStore((s) => s.currentUserId);
 
+  const setDraft = useDraftsStore((s) => s.setDraft);
+  const clearDraft = useDraftsStore((s) => s.clearDraft);
+  const getDraft = useDraftsStore((s) => s.getDraft);
+
   // Effective editing post id: external (thread) takes priority over store (channel)
   const editingPostId = rootId ? externalEditingPostId ?? null : storeEditingPostId;
   const editingPost = editingPostId ? posts[editingPostId] : null;
@@ -119,7 +124,8 @@ export function MessageComposer({ channelId, serverId, rootId, externalEditingPo
   }, [editingPostId]);
 
   useEffect(() => {
-    setText("");
+    const draft = getDraft(channelId, rootId ?? "");
+    setText(draft?.message ?? "");
     setAttachments([]);
     if (!rootId) setEditingPostId(null);
     textareaRef.current?.focus();
@@ -140,6 +146,12 @@ export function MessageComposer({ channelId, serverId, rootId, externalEditingPo
   }, []);
 
   useEffect(() => { adjustHeight(); }, [text, adjustHeight]);
+
+  // Save draft whenever text changes (skip when editing an existing post)
+  useEffect(() => {
+    if (editingPostId) return;
+    setDraft(channelId, rootId ?? "", text);
+  }, [text, channelId, rootId, editingPostId]);
 
   // Emoji autocomplete
   useEffect(() => {
@@ -488,6 +500,7 @@ export function MessageComposer({ channelId, serverId, rootId, externalEditingPo
       }
       setText("");
       setAttachments([]);
+      clearDraft(channelId, rootId ?? "");
       if (textareaRef.current) textareaRef.current.style.height = "auto";
     } catch (e) {
       console.error("Failed to send:", e);
@@ -574,7 +587,9 @@ export function MessageComposer({ channelId, serverId, rootId, externalEditingPo
     } else {
       setEditingPostId(null);
     }
-    setText("");
+    // Restore draft after cancelling edit
+    const draft = getDraft(channelId, rootId ?? "");
+    setText(draft?.message ?? "");
     if (textareaRef.current) textareaRef.current.style.height = "auto";
     textareaRef.current?.focus();
   }

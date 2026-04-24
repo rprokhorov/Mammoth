@@ -1772,6 +1772,56 @@ impl MattermostClient {
         Ok((in_channel, out_of_channel))
     }
 
+    // --- Drafts ---
+
+    pub async fn get_user_drafts(&self, user_id: &str) -> Result<Vec<Draft>, AppError> {
+        let resp = self
+            .get_authenticated(&format!("/users/{}/drafts", user_id))
+            .await?;
+        let drafts: Vec<Draft> = resp.json().await?;
+        Ok(drafts)
+    }
+
+    pub async fn upsert_draft(&self, req: &UpsertDraftRequest) -> Result<(), AppError> {
+        let auth = self.auth_header()?;
+        let resp = self
+            .http
+            .post(self.api_url("/drafts"))
+            .header(header::AUTHORIZATION, &auth)
+            .json(req)
+            .send()
+            .await?;
+
+        if !resp.status().is_success() {
+            let status = resp.status().as_u16();
+            let msg = resp.text().await.unwrap_or_default();
+            return Err(AppError::Api { status, message: msg });
+        }
+        Ok(())
+    }
+
+    pub async fn delete_draft(&self, user_id: &str, channel_id: &str, root_id: &str) -> Result<(), AppError> {
+        let auth = self.auth_header()?;
+        let path = if root_id.is_empty() {
+            format!("/users/{}/channels/{}/drafts", user_id, channel_id)
+        } else {
+            format!("/users/{}/channels/{}/drafts?root_id={}", user_id, channel_id, root_id)
+        };
+        let resp = self
+            .http
+            .delete(self.api_url(&path))
+            .header(header::AUTHORIZATION, &auth)
+            .send()
+            .await?;
+
+        if !resp.status().is_success() {
+            let status = resp.status().as_u16();
+            let msg = resp.text().await.unwrap_or_default();
+            return Err(AppError::Api { status, message: msg });
+        }
+        Ok(())
+    }
+
     /// Get WebSocket URL for this server
     pub fn websocket_url(&self) -> Result<String, AppError> {
         let base = self.base_url.as_str();

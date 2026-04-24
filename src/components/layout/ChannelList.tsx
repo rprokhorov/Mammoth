@@ -5,6 +5,7 @@ import { useUiStore, type ChannelInfo, type SidebarCategory } from "@/stores/uiS
 import { useMessagesStore, type PostData } from "@/stores/messagesStore";
 import { useThreadsStore } from "@/stores/threadsStore";
 import { useReactionsStore } from "@/stores/reactionsStore";
+import { useDraftsStore } from "@/stores/draftsStore";
 import { useTabsStore } from "@/stores/tabsStore";
 import { UserAvatar } from "@/components/common/UserAvatar";
 import { QuickSwitcher } from "@/components/search/QuickSwitcher";
@@ -51,6 +52,7 @@ export function ChannelList({ onSelectChannel, onCreateChannel, serverId, curren
   const sidebarCategories = useUiStore((s) => s.sidebarCategories);
   const userThreadsUnread = useThreadsStore((s) => s.userThreadsUnread);
   const reactionsUnread = useReactionsStore((s) => s.unreadCount);
+  const draftsCount = useDraftsStore((s) => Object.keys(s.drafts).length);
 
   const [contextMenu, setContextMenu] = useState<{
     channelId: string;
@@ -187,6 +189,16 @@ export function ChannelList({ onSelectChannel, onCreateChannel, serverId, curren
     } else {
       store.setActiveChannelId(null);
       store.setMainSubView("reactions");
+    }
+  }
+
+  function handleDraftsClick() {
+    const store = useUiStore.getState();
+    if (mainSubView === "drafts") {
+      store.setMainSubView("channels");
+    } else {
+      store.setActiveChannelId(null);
+      store.setMainSubView("drafts");
     }
   }
 
@@ -644,6 +656,16 @@ export function ChannelList({ onSelectChannel, onCreateChannel, serverId, curren
           <span className="channel-name">Reactions</span>
           {reactionsUnread > 0 && (
             <span className="mention-badge">{reactionsUnread}</span>
+          )}
+        </button>
+        <button
+          className={`channel-item threads-nav-btn ${mainSubView === "drafts" ? "active" : ""}`}
+          onClick={handleDraftsClick}
+        >
+          <span className="channel-prefix">&#x1F4DD;</span>
+          <span className="channel-name">Drafts</span>
+          {draftsCount > 0 && (
+            <span className="mention-badge">{draftsCount}</span>
           )}
         </button>
       </div>

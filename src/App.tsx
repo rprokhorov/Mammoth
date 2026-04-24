@@ -17,7 +17,9 @@ import { ThreadPanel } from "@/components/message/ThreadPanel";
 import { TypingIndicator } from "@/components/message/TypingIndicator";
 import { ThreadsView } from "@/components/message/ThreadsView";
 import { ReactionsView } from "@/components/message/ReactionsView";
+import { DraftsView } from "@/components/message/DraftsView";
 import { useThreadsStore, type UserThread } from "@/stores/threadsStore";
+import { useDraftsStore } from "@/stores/draftsStore";
 import { useTabsStore } from "@/stores/tabsStore";
 import { useCustomEmojiStore, type CustomEmoji } from "@/stores/customEmojiStore";
 import { SearchBar } from "@/components/search/SearchBar";
@@ -435,6 +437,9 @@ function AppContent() {
 
       // Emojis always in background
       loadCustomEmojis(targetId).catch(() => {});
+
+      // Load drafts from server (merges with local, server wins if newer)
+      useDraftsStore.getState().loadFromServer(targetId).catch(() => {});
     } catch (e) {
       console.error("Failed to load servers:", e);
       setInitError(String(e));
@@ -479,6 +484,9 @@ function AppContent() {
 
     // Load custom emojis in background
     loadCustomEmojis(serverId).catch(() => {});
+
+    // Load drafts from server
+    useDraftsStore.getState().loadFromServer(serverId).catch(() => {});
 
     store.setCurrentView("main");
   }
@@ -799,6 +807,8 @@ function AppContent() {
                   <ThreadsView serverId={activeServerId} teamId={activeTeamId} currentUserId={currentUserId} />
                 ) : mainSubView === "reactions" && activeServerId ? (
                   <ReactionsView currentUserId={currentUserId} serverId={activeServerId} />
+                ) : mainSubView === "drafts" ? (
+                  <DraftsView />
                 ) : activeChannel && activeServerId ? (
                   <>
                     <MessageList

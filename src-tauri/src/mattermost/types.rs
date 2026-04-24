@@ -177,6 +177,33 @@ pub struct PostList {
     pub next_post_id: String,
 }
 
+// --- Drafts ---
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Draft {
+    pub user_id: String,
+    pub channel_id: String,
+    #[serde(default)]
+    pub root_id: String,
+    pub message: String,
+    #[serde(default)]
+    pub file_ids: Vec<String>,
+    #[serde(default)]
+    pub create_at: i64,
+    #[serde(default)]
+    pub update_at: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UpsertDraftRequest {
+    pub channel_id: String,
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub root_id: String,
+    pub message: String,
+    #[serde(default)]
+    pub file_ids: Vec<String>,
+}
+
 // --- Threads ---
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
