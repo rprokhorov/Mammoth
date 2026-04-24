@@ -1,6 +1,6 @@
 {
   "name": "mattermost-desktop-client",
-  "version": "0.1.1",
+  "version": "0.4.0",
   "private": true,
   "description": "Cross-platform Mattermost desktop client built with Tauri 2 + React",
   "type": "module",
