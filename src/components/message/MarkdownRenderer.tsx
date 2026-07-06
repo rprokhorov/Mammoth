@@ -1,4 +1,5 @@
 import { marked, Renderer } from "marked";
+import DOMPurify from "dompurify";
 import { useMemo, useState, useCallback } from "react";
 import { emit } from "@tauri-apps/api/event";
 import { emojiNameToUnicode } from "./EmojiPicker";
@@ -49,10 +50,18 @@ renderer.code = ({ text, lang }) => {
   return `<pre class="code-block"><code${langClass}>${escaped}</code></pre>`;
 };
 
-// Inline code
+// Inline code (text arrives already escaped by marked's tokenizer)
 renderer.codespan = ({ text }) => {
   return `<code class="inline-code">${text}</code>`;
 };
+
+// Sanitize rendered HTML before it reaches dangerouslySetInnerHTML.
+// marked passes raw HTML in messages through unchanged, so any user on the
+// server could otherwise inject markup that executes in the webview.
+// ADD_ATTR keeps target="_blank" on links (stripped by default).
+export function sanitizeHtml(html: string): string {
+  return DOMPurify.sanitize(html, { ADD_ATTR: ["target"] });
+}
 
 marked.setOptions({ renderer, gfm: true, breaks: true });
 
@@ -64,14 +73,15 @@ function getUserDisplayName(username: string, users: Record<string, { username: 
   return user.username;
 }
 
-function renderMarkdown(
-  text: string,
+// Fenced blocks and inline code spans — mention/emoji preprocessing must not touch these
+const CODE_SEGMENT = /(```[\s\S]*?(?:```|$)|~~~[\s\S]*?(?:~~~|$)|``[^`]*``|`[^`\n]*`)/;
+
+function preprocessSegment(
+  segment: string,
   users: Record<string, { username: string; first_name: string; last_name: string; nickname: string }>,
   channelsByName: Record<string, string>,
-): { html: string; mermaidBlocks: string[] } {
-  collectedMermaidBlocks = [];
-
-  let processed = text
+): string {
+  return segment
     .replace(/@([\w.-]+)/g, (_match, username) => {
       const displayName = getUserDisplayName(username, users);
       return `<span class="mention" data-username="${escapeAttr(username)}">@${escapeAttr(displayName)}</span>`;
@@ -85,6 +95,20 @@ function renderMarkdown(
       const unicode = emojiNameToUnicode(name);
       return unicode.startsWith(":") ? match : unicode;
     });
+}
+
+function renderMarkdown(
+  text: string,
+  users: Record<string, { username: string; first_name: string; last_name: string; nickname: string }>,
+  channelsByName: Record<string, string>,
+): { html: string; mermaidBlocks: string[] } {
+  collectedMermaidBlocks = [];
+
+  // Odd-indexed split parts are code segments (captured by the regex) — leave them untouched
+  const processed = text
+    .split(CODE_SEGMENT)
+    .map((seg, i) => (i % 2 === 1 ? seg : preprocessSegment(seg, users, channelsByName)))
+    .join("");
 
   const html = marked.parse(processed) as string;
   const mermaidBlocks = collectedMermaidBlocks;
@@ -158,11 +182,11 @@ export function MarkdownRenderer({ text, serverId }: MarkdownRendererProps) {
   const body = (
     <>
       {mermaidBlocks.length === 0 ? (
-        <span dangerouslySetInnerHTML={{ __html: htmlParts[0] }} />
+        <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(htmlParts[0]) }} />
       ) : (
         htmlParts.map((html, i) => (
           <span key={i}>
-            {html && <span dangerouslySetInnerHTML={{ __html: html }} />}
+            {html && <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(html) }} />}
             {i < mermaidBlocks.length && <MermaidBlock code={mermaidBlocks[i]} />}
           </span>
         ))
