@@ -31,7 +31,7 @@ jobs:
       - name: Install Linux dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev libdbus-1-dev
 
       - name: Install npm dependencies
         run: npm ci
@@ -48,5 +48,8 @@ jobs:
       - name: Frontend build check
         run: npx tsc --noEmit
 
+      - name: Frontend lint
+        run: npm run lint
+
       - name: Frontend tests
-        run: npm run test -- --passWithNoTests || true
+        run: npm run test
