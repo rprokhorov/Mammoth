@@ -86,7 +86,7 @@ function AddToChannelModal({
         });
         // Only show public/private channels (not DM)
         setResults(channels.filter((c) => c.channel_type === "O" || c.channel_type === "P"));
-      } catch (e) {
+      } catch {
         setResults([]);
       } finally {
         setLoading(false);
@@ -101,8 +101,8 @@ function AddToChannelModal({
     try {
       await invoke("add_user_to_channel", { serverId, channelId, userId });
       setDone(channelId);
-    } catch (e: any) {
-      const msg = typeof e === "string" ? e : (e?.message ?? "Error");
+    } catch (e: unknown) {
+      const msg = typeof e === "string" ? e : e instanceof Error ? e.message : "Error";
       setError(msg);
     } finally {
       setAdding(null);

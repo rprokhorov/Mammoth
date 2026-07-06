@@ -70,7 +70,7 @@ export const CustomEmojiRenderer = memo(function CustomEmojiRenderer({ text, ser
 
   // Remaining text after last emoji
   if (lastIndex < text.length) {
-    parts.push(<MarkdownRenderer key={key++} text={text.slice(lastIndex)} serverId={serverId} />);
+    parts.push(<MarkdownRenderer key={key} text={text.slice(lastIndex)} serverId={serverId} />);
   }
 
   return <>{parts}</>;

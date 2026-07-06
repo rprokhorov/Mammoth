@@ -245,7 +245,7 @@ export function MessageList({
               bottomRef.current?.scrollIntoView();
             });
           }
-        } catch (_) {
+        } catch {
           // disk cache miss — no problem, network fetch follows
         }
       }

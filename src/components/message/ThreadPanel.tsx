@@ -167,9 +167,39 @@ export function ThreadPanel({ serverId, currentUserId, width }: ThreadPanelProps
     return () => clearTimeout(timer);
   }, [scrollToThreadPostId, order]);
 
-  if (!activeThreadId) return null;
+  const rootPost = activeThreadId
+    ? threadPosts[activeThreadId] || useMessagesStore.getState().posts[activeThreadId]
+    : undefined;
 
-  const rootPost = threadPosts[activeThreadId] || useMessagesStore.getState().posts[activeThreadId];
+  const channelName = useMemo(() => {
+    if (!rootPost) return null;
+    const store = useUiStore.getState();
+    const ch = store.channels.find((c) => c.id === rootPost.channel_id);
+    if (!ch) return null;
+    if (ch.channel_type === "D") {
+      const parts = ch.name.split("__");
+      for (const part of parts) {
+        if (part === currentUserId) continue;
+        const user = store.users[part];
+        if (user) return user.nickname || `${user.first_name} ${user.last_name}`.trim() || user.username;
+      }
+      // fallback: any part
+      for (const part of parts) {
+        const user = store.users[part];
+        if (user) return user.nickname || `${user.first_name} ${user.last_name}`.trim() || user.username;
+      }
+      return ch.display_name || "Direct Message";
+    }
+    return ch.display_name || ch.name;
+  }, [rootPost, currentUserId]);
+
+  const isDmChannel = useMemo(() => {
+    if (!rootPost) return false;
+    const ch = useUiStore.getState().channels.find((c) => c.id === rootPost.channel_id);
+    return ch?.channel_type === "D" || ch?.channel_type === "G";
+  }, [rootPost]);
+
+  if (!activeThreadId) return null;
 
   function handleEditPost(postId: string) {
     const post = threadPosts[postId] || useMessagesStore.getState().posts[postId];
@@ -219,34 +249,6 @@ export function ThreadPanel({ serverId, currentUserId, width }: ThreadPanelProps
 
   // Count replies (all posts except root)
   const replyCount = order.filter((id) => id !== activeThreadId).length;
-
-  const channelName = useMemo(() => {
-    if (!rootPost) return null;
-    const store = useUiStore.getState();
-    const ch = store.channels.find((c) => c.id === rootPost.channel_id);
-    if (!ch) return null;
-    if (ch.channel_type === "D") {
-      const parts = ch.name.split("__");
-      for (const part of parts) {
-        if (part === currentUserId) continue;
-        const user = store.users[part];
-        if (user) return user.nickname || `${user.first_name} ${user.last_name}`.trim() || user.username;
-      }
-      // fallback: any part
-      for (const part of parts) {
-        const user = store.users[part];
-        if (user) return user.nickname || `${user.first_name} ${user.last_name}`.trim() || user.username;
-      }
-      return ch.display_name || "Direct Message";
-    }
-    return ch.display_name || ch.name;
-  }, [rootPost, currentUserId]);
-
-  const isDmChannel = useMemo(() => {
-    if (!rootPost) return false;
-    const ch = useUiStore.getState().channels.find((c) => c.id === rootPost.channel_id);
-    return ch?.channel_type === "D" || ch?.channel_type === "G";
-  }, [rootPost]);
 
   return (
     <div
