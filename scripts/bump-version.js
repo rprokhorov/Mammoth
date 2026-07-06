@@ -16,6 +16,8 @@ if (!['patch', 'minor', 'major'].includes(type)) {
 
 const pkgPath = resolve(root, 'package.json');
 const tauriPath = resolve(root, 'src-tauri/tauri.conf.json');
+const cargoPath = resolve(root, 'src-tauri/Cargo.toml');
+const cargoLockPath = resolve(root, 'src-tauri/Cargo.lock');
 
 const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));
 const tauri = JSON.parse(readFileSync(tauriPath, 'utf8'));
@@ -33,9 +35,23 @@ tauri.version = newVersion;
 writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n');
 writeFileSync(tauriPath, JSON.stringify(tauri, null, 2) + '\n');
 
-console.log(`Bumped version: ${pkg.version.replace(newVersion, '')}${newVersion}`);
+// Keep the Rust crate version in sync (first `version = ...` in [package])
+const cargo = readFileSync(cargoPath, 'utf8');
+writeFileSync(cargoPath, cargo.replace(/^version = ".*"$/m, `version = "${newVersion}"`));
 
-execSync(`git add package.json src-tauri/tauri.conf.json`, { cwd: root, stdio: 'inherit' });
+// Update the app's own entry in Cargo.lock so builds don't rewrite it
+const cargoLock = readFileSync(cargoLockPath, 'utf8');
+writeFileSync(
+  cargoLockPath,
+  cargoLock.replace(
+    /(name = "mattermost-desktop"\nversion = ")[^"]*(")/,
+    `$1${newVersion}$2`
+  )
+);
+
+console.log(`Bumped version to ${newVersion}`);
+
+execSync(`git add package.json src-tauri/tauri.conf.json src-tauri/Cargo.toml src-tauri/Cargo.lock`, { cwd: root, stdio: 'inherit' });
 execSync(`git commit -m "chore: bump version to ${newVersion}"`, { cwd: root, stdio: 'inherit' });
 execSync(`git tag v${newVersion}`, { cwd: root, stdio: 'inherit' });
 

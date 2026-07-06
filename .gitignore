@@ -27,3 +27,6 @@ npm-debug.log*
 
 # Postgres data (runtime files, not for VCS)
 docker/postgres/
+
+# Debug artifacts
+*-recording.json
