@@ -15,7 +15,7 @@
     "version:major": "node scripts/bump-version.js major",
     "test": "vitest run --config vitest.config.ts",
     "test:watch": "vitest --config vitest.config.ts",
-    "lint": "eslint src --ext .ts,.tsx",
+    "lint": "eslint src",
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\""
   },
   "keywords": [
@@ -29,14 +29,15 @@
     "@tauri-apps/api": "^2.10.1",
     "@tauri-apps/plugin-dialog": "^2.6.0",
     "@tauri-apps/plugin-notification": "^2.3.3",
+    "dompurify": "^3.4.11",
     "marked": "^13.0.3",
     "mermaid": "^11.14.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
-    "react-router-dom": "^7.13.2",
     "zustand": "^5.0.12"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@tauri-apps/cli": "^2.10.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
@@ -45,8 +46,12 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",
     "@vitest/ui": "^4.1.5",
+    "eslint": "^10.6.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
     "jsdom": "^29.0.2",
+    "prettier": "^3.9.4",
     "typescript": "^6.0.2",
+    "typescript-eslint": "^8.63.0",
     "vite": "^8.0.3",
     "vitest": "^4.1.5"
   }
