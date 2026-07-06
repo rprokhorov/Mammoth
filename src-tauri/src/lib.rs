@@ -1,3 +1,7 @@
+// AppError embeds tungstenite's error (136+ bytes); boxing it is a wider
+// refactor than the perf win justifies for a desktop app
+#![allow(clippy::result_large_err)]
+
 mod commands;
 mod errors;
 mod mattermost;
@@ -7,11 +11,11 @@ mod state;
 mod storage;
 mod tray;
 
+use state::AppState;
 use tauri::{
     menu::{Menu, MenuItemBuilder, PredefinedMenuItem},
     Emitter, Manager,
 };
-use state::AppState;
 
 #[tauri::command]
 fn show_notification(title: String, body: String, channel_id: String) {
@@ -43,7 +47,6 @@ fn show_main_window(app: tauri::AppHandle) {
         let _ = window.set_focus();
     }
 }
-
 
 #[tauri::command]
 fn set_badge_count(app: tauri::AppHandle, count: u32) -> Result<(), String> {

@@ -19,14 +19,19 @@ pub async fn upload_file(
     file_name: String,
 ) -> Result<FileUploadResult, AppError> {
     let client = {
-        let servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let servers = state
+            .servers
+            .lock()
+            .map_err(|e| AppError::Config(e.to_string()))?;
         let server = servers
             .get(&server_id)
             .ok_or_else(|| AppError::NotFound(format!("Server {} not found", server_id)))?;
         server.client.clone()
     };
 
-    let infos = client.upload_file(&channel_id, &file_path, &file_name).await?;
+    let infos = client
+        .upload_file(&channel_id, &file_path, &file_name)
+        .await?;
     Ok(FileUploadResult { file_infos: infos })
 }
 
@@ -37,7 +42,10 @@ pub async fn get_file_info(
     file_id: String,
 ) -> Result<FileInfo, AppError> {
     let client = {
-        let servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let servers = state
+            .servers
+            .lock()
+            .map_err(|e| AppError::Config(e.to_string()))?;
         let server = servers
             .get(&server_id)
             .ok_or_else(|| AppError::NotFound(format!("Server {} not found", server_id)))?;
@@ -59,12 +67,17 @@ pub async fn get_file_url(
     server_id: String,
     file_id: String,
 ) -> Result<FileUrlResult, AppError> {
-    let servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+    let servers = state
+        .servers
+        .lock()
+        .map_err(|e| AppError::Config(e.to_string()))?;
     let server = servers
         .get(&server_id)
         .ok_or_else(|| AppError::NotFound(format!("Server {} not found", server_id)))?;
     let url = server.client.file_url(&file_id);
-    let token = server.client.token()
+    let token = server
+        .client
+        .token()
         .ok_or_else(|| AppError::Auth("Not logged in".into()))?
         .to_string();
     Ok(FileUrlResult { url, token })
@@ -85,7 +98,10 @@ pub async fn get_image_data(
     mime_type: String,
 ) -> Result<ImageDataResult, AppError> {
     let client = {
-        let servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let servers = state
+            .servers
+            .lock()
+            .map_err(|e| AppError::Config(e.to_string()))?;
         let server = servers
             .get(&server_id)
             .ok_or_else(|| AppError::NotFound(format!("Server {} not found", server_id)))?;
@@ -108,7 +124,10 @@ pub async fn get_image_thumbnail(
     mime_type: String,
 ) -> Result<ImageDataResult, AppError> {
     let client = {
-        let servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let servers = state
+            .servers
+            .lock()
+            .map_err(|e| AppError::Config(e.to_string()))?;
         let server = servers
             .get(&server_id)
             .ok_or_else(|| AppError::NotFound(format!("Server {} not found", server_id)))?;
@@ -176,7 +195,10 @@ pub async fn get_custom_emojis(
     per_page: u32,
 ) -> Result<Vec<CustomEmoji>, AppError> {
     let client = {
-        let servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let servers = state
+            .servers
+            .lock()
+            .map_err(|e| AppError::Config(e.to_string()))?;
         let server = servers
             .get(&server_id)
             .ok_or_else(|| AppError::NotFound(format!("Server {} not found", server_id)))?;
@@ -204,7 +226,10 @@ pub async fn get_custom_emoji_image(
     emoji_id: String,
 ) -> Result<ImageDataResult, AppError> {
     let client = {
-        let servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let servers = state
+            .servers
+            .lock()
+            .map_err(|e| AppError::Config(e.to_string()))?;
         let server = servers
             .get(&server_id)
             .ok_or_else(|| AppError::NotFound(format!("Server {} not found", server_id)))?;
@@ -222,7 +247,9 @@ pub async fn get_custom_emoji_image(
     };
     use base64::Engine;
     let encoded = base64::engine::general_purpose::STANDARD.encode(&bytes);
-    Ok(ImageDataResult { data_url: format!("data:{};base64,{}", mime, encoded) })
+    Ok(ImageDataResult {
+        data_url: format!("data:{};base64,{}", mime, encoded),
+    })
 }
 
 /// Downloads a user's profile image and returns it as a base64 data URL.
@@ -233,7 +260,10 @@ pub async fn get_user_avatar(
     user_id: String,
 ) -> Result<ImageDataResult, AppError> {
     let client = {
-        let servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let servers = state
+            .servers
+            .lock()
+            .map_err(|e| AppError::Config(e.to_string()))?;
         let server = servers
             .get(&server_id)
             .ok_or_else(|| AppError::NotFound(format!("Server {} not found", server_id)))?;
@@ -253,7 +283,9 @@ pub async fn get_user_avatar(
     };
     use base64::Engine;
     let encoded = base64::engine::general_purpose::STANDARD.encode(&bytes);
-    Ok(ImageDataResult { data_url: format!("data:{};base64,{}", mime, encoded) })
+    Ok(ImageDataResult {
+        data_url: format!("data:{};base64,{}", mime, encoded),
+    })
 }
 
 /// Reads a local file and returns it as a base64 data URL.
@@ -286,7 +318,9 @@ pub async fn save_temp_file(
     let _ = app; // AppHandle not needed — use std temp dir
     let tmp_dir = std::env::temp_dir();
     let tmp_path = tmp_dir.join(&file_name);
-    tokio::fs::write(&tmp_path, &bytes).await.map_err(AppError::Io)?;
+    tokio::fs::write(&tmp_path, &bytes)
+        .await
+        .map_err(AppError::Io)?;
     Ok(tmp_path.to_string_lossy().to_string())
 }
 
@@ -298,7 +332,10 @@ pub async fn download_file(
     save_path: String,
 ) -> Result<(), AppError> {
     let client = {
-        let servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let servers = state
+            .servers
+            .lock()
+            .map_err(|e| AppError::Config(e.to_string()))?;
         let server = servers
             .get(&server_id)
             .ok_or_else(|| AppError::NotFound(format!("Server {} not found", server_id)))?;
@@ -306,6 +343,8 @@ pub async fn download_file(
     };
 
     let bytes = client.download_file(&file_id).await?;
-    tokio::fs::write(&save_path, &bytes).await.map_err(AppError::Io)?;
+    tokio::fs::write(&save_path, &bytes)
+        .await
+        .map_err(AppError::Io)?;
     Ok(())
 }

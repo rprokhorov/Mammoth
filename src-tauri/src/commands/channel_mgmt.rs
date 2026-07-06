@@ -5,6 +5,7 @@ use crate::mattermost::types::Channel;
 use crate::state::AppState;
 
 #[tauri::command]
+#[allow(clippy::too_many_arguments)] // arguments mirror the Mattermost create-channel API
 pub async fn create_channel(
     state: State<'_, AppState>,
     server_id: String,
@@ -16,7 +17,10 @@ pub async fn create_channel(
     header: Option<String>,
 ) -> Result<Channel, AppError> {
     let client = {
-        let servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let servers = state
+            .servers
+            .lock()
+            .map_err(|e| AppError::Config(e.to_string()))?;
         let server = servers
             .get(&server_id)
             .ok_or_else(|| AppError::NotFound("Server not found".into()))?;
@@ -45,7 +49,10 @@ pub async fn update_channel(
     purpose: Option<String>,
 ) -> Result<Channel, AppError> {
     let client = {
-        let servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let servers = state
+            .servers
+            .lock()
+            .map_err(|e| AppError::Config(e.to_string()))?;
         let server = servers
             .get(&server_id)
             .ok_or_else(|| AppError::NotFound("Server not found".into()))?;
@@ -75,7 +82,10 @@ pub async fn archive_channel(
     channel_id: String,
 ) -> Result<(), AppError> {
     let client = {
-        let servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let servers = state
+            .servers
+            .lock()
+            .map_err(|e| AppError::Config(e.to_string()))?;
         let server = servers
             .get(&server_id)
             .ok_or_else(|| AppError::NotFound("Server not found".into()))?;
@@ -92,7 +102,10 @@ pub async fn leave_channel(
     channel_id: String,
 ) -> Result<(), AppError> {
     let (client, user_id) = {
-        let servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let servers = state
+            .servers
+            .lock()
+            .map_err(|e| AppError::Config(e.to_string()))?;
         let server = servers
             .get(&server_id)
             .ok_or_else(|| AppError::NotFound("Server not found".into()))?;
@@ -115,7 +128,10 @@ pub async fn create_direct_channel(
     other_user_id: String,
 ) -> Result<Channel, AppError> {
     let (client, my_user_id) = {
-        let servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let servers = state
+            .servers
+            .lock()
+            .map_err(|e| AppError::Config(e.to_string()))?;
         let server = servers
             .get(&server_id)
             .ok_or_else(|| AppError::NotFound("Server not found".into()))?;
@@ -127,7 +143,9 @@ pub async fn create_direct_channel(
         (server.client.clone(), uid)
     };
 
-    client.create_direct_channel(&my_user_id, &other_user_id).await
+    client
+        .create_direct_channel(&my_user_id, &other_user_id)
+        .await
 }
 
 /// Search public/private channels in team by term
@@ -139,7 +157,10 @@ pub async fn search_channels(
     term: String,
 ) -> Result<Vec<Channel>, AppError> {
     let client = {
-        let servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let servers = state
+            .servers
+            .lock()
+            .map_err(|e| AppError::Config(e.to_string()))?;
         let server = servers
             .get(&server_id)
             .ok_or_else(|| AppError::NotFound("Server not found".into()))?;
@@ -158,7 +179,10 @@ pub async fn add_user_to_channel(
     user_id: String,
 ) -> Result<(), AppError> {
     let client = {
-        let servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let servers = state
+            .servers
+            .lock()
+            .map_err(|e| AppError::Config(e.to_string()))?;
         let server = servers
             .get(&server_id)
             .ok_or_else(|| AppError::NotFound("Server not found".into()))?;

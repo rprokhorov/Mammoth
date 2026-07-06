@@ -47,7 +47,10 @@ pub async fn init_app_fast(
     server_id: String,
 ) -> Result<Option<InitAppFastResult>, AppError> {
     let client = {
-        let servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let servers = state
+            .servers
+            .lock()
+            .map_err(|e| AppError::Config(e.to_string()))?;
         let server = servers
             .get(&server_id)
             .ok_or_else(|| AppError::NotFound(format!("Server {} not found", server_id)))?;
@@ -63,7 +66,10 @@ pub async fn init_app_fast(
 
     // Store current_user so other commands work immediately
     {
-        let mut servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let mut servers = state
+            .servers
+            .lock()
+            .map_err(|e| AppError::Config(e.to_string()))?;
         if let Some(server) = servers.get_mut(&server_id) {
             server.current_user = Some(user.clone());
         }
@@ -83,7 +89,12 @@ pub async fn init_app_fast(
 
     let (cached_channels, cached_sidebar_categories, cached_favorite_channel_ids, cached_dm_users) =
         if let Some(c) = cached {
-            (c.channels, c.sidebar_categories, c.favorite_channel_ids, c.dm_users)
+            (
+                c.channels,
+                c.sidebar_categories,
+                c.favorite_channel_ids,
+                c.dm_users,
+            )
         } else {
             (vec![], vec![], vec![], vec![])
         };
@@ -110,7 +121,10 @@ pub async fn load_channels_data(
     team_id: String,
 ) -> Result<(), AppError> {
     let (client, user_id) = {
-        let servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let servers = state
+            .servers
+            .lock()
+            .map_err(|e| AppError::Config(e.to_string()))?;
         let server = servers
             .get(&server_id)
             .ok_or_else(|| AppError::NotFound(format!("Server {} not found", server_id)))?;
@@ -153,11 +167,17 @@ pub async fn load_channels_data(
 
         let channels_raw = match channels_res {
             Ok(v) => v,
-            Err(e) => { log::error!("load_channels_data: channels: {}", e); return; }
+            Err(e) => {
+                log::error!("load_channels_data: channels: {}", e);
+                return;
+            }
         };
         let members_raw = match members_res {
             Ok(v) => v,
-            Err(e) => { log::error!("load_channels_data: members: {}", e); return; }
+            Err(e) => {
+                log::error!("load_channels_data: members: {}", e);
+                return;
+            }
         };
         let sidebar_categories = sidebar_res.unwrap_or_default();
         let favorite_prefs = favorites_res.unwrap_or_default();
@@ -166,7 +186,11 @@ pub async fn load_channels_data(
             .iter()
             .filter_map(|p| {
                 let val = p.get("value")?.as_str()?;
-                if val == "true" { p.get("name")?.as_str().map(String::from) } else { None }
+                if val == "true" {
+                    p.get("name")?.as_str().map(String::from)
+                } else {
+                    None
+                }
             })
             .collect();
 
@@ -194,7 +218,10 @@ pub async fn load_channels_data(
         let dm_users = if dm_user_ids.is_empty() {
             vec![]
         } else {
-            client.get_users_by_ids(&dm_user_ids).await.unwrap_or_default()
+            client
+                .get_users_by_ids(&dm_user_ids)
+                .await
+                .unwrap_or_default()
         };
 
         // Save fresh data to disk cache for next session

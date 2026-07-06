@@ -2,7 +2,7 @@ use serde::Serialize;
 use tauri::{Manager, State};
 
 use crate::errors::AppError;
-use crate::mattermost::types::{Post, PostList, SlashCommand};
+use crate::mattermost::types::{Post, SlashCommand};
 use crate::state::AppState;
 use crate::storage::posts_cache::{self, ChannelPostsCache};
 
@@ -29,7 +29,10 @@ pub async fn get_posts_around_last_unread(
     limit_after: u32,
 ) -> Result<UnreadPostsResponse, AppError> {
     let (client, user_id) = {
-        let servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let servers = state
+            .servers
+            .lock()
+            .map_err(|e| AppError::Config(e.to_string()))?;
         let server = servers
             .get(&server_id)
             .ok_or_else(|| AppError::NotFound(format!("Server {} not found", server_id)))?;
@@ -62,7 +65,10 @@ pub async fn get_posts(
     per_page: u32,
 ) -> Result<PostsResponse, AppError> {
     let client = {
-        let servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let servers = state
+            .servers
+            .lock()
+            .map_err(|e| AppError::Config(e.to_string()))?;
         let server = servers
             .get(&server_id)
             .ok_or_else(|| AppError::NotFound(format!("Server {} not found", server_id)))?;
@@ -108,7 +114,11 @@ pub async fn save_posts_cache(
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
         .as_millis() as i64;
-    let cache = ChannelPostsCache { saved_at, order, posts };
+    let cache = ChannelPostsCache {
+        saved_at,
+        order,
+        posts,
+    };
     posts_cache::save(&cache_dir, &server_id, &channel_id, &cache).map_err(|e| e.to_string())
 }
 
@@ -122,7 +132,10 @@ pub async fn send_post(
     file_ids: Option<Vec<String>>,
 ) -> Result<Post, AppError> {
     let client = {
-        let servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let servers = state
+            .servers
+            .lock()
+            .map_err(|e| AppError::Config(e.to_string()))?;
         let server = servers
             .get(&server_id)
             .ok_or_else(|| AppError::NotFound(format!("Server {} not found", server_id)))?;
@@ -130,7 +143,12 @@ pub async fn send_post(
     };
 
     client
-        .create_post(&channel_id, &message, root_id.as_deref(), file_ids.as_deref())
+        .create_post(
+            &channel_id,
+            &message,
+            root_id.as_deref(),
+            file_ids.as_deref(),
+        )
         .await
 }
 
@@ -142,7 +160,10 @@ pub async fn edit_post(
     message: String,
 ) -> Result<Post, AppError> {
     let client = {
-        let servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let servers = state
+            .servers
+            .lock()
+            .map_err(|e| AppError::Config(e.to_string()))?;
         let server = servers
             .get(&server_id)
             .ok_or_else(|| AppError::NotFound(format!("Server {} not found", server_id)))?;
@@ -162,7 +183,10 @@ pub async fn do_post_action(
     cookie: String,
 ) -> Result<serde_json::Value, AppError> {
     let client = {
-        let servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let servers = state
+            .servers
+            .lock()
+            .map_err(|e| AppError::Config(e.to_string()))?;
         let server = servers
             .get(&server_id)
             .ok_or_else(|| AppError::NotFound(format!("Server {} not found", server_id)))?;
@@ -173,8 +197,16 @@ pub async fn do_post_action(
         .do_post_action(
             &post_id,
             &action_id,
-            if selected_option.is_empty() { None } else { Some(selected_option.as_str()) },
-            if cookie.is_empty() { None } else { Some(cookie.as_str()) },
+            if selected_option.is_empty() {
+                None
+            } else {
+                Some(selected_option.as_str())
+            },
+            if cookie.is_empty() {
+                None
+            } else {
+                Some(cookie.as_str())
+            },
         )
         .await
 }
@@ -186,7 +218,10 @@ pub async fn delete_post(
     post_id: String,
 ) -> Result<(), AppError> {
     let client = {
-        let servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let servers = state
+            .servers
+            .lock()
+            .map_err(|e| AppError::Config(e.to_string()))?;
         let server = servers
             .get(&server_id)
             .ok_or_else(|| AppError::NotFound(format!("Server {} not found", server_id)))?;
@@ -205,14 +240,19 @@ pub async fn autocomplete_slash_commands(
     command: String,
 ) -> Result<Vec<SlashCommand>, AppError> {
     let client = {
-        let servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let servers = state
+            .servers
+            .lock()
+            .map_err(|e| AppError::Config(e.to_string()))?;
         let server = servers
             .get(&server_id)
             .ok_or_else(|| AppError::NotFound(format!("Server {} not found", server_id)))?;
         server.client.clone()
     };
 
-    client.autocomplete_commands(&team_id, &channel_id, &command).await
+    client
+        .autocomplete_commands(&team_id, &channel_id, &command)
+        .await
 }
 
 #[tauri::command]
@@ -224,12 +264,17 @@ pub async fn execute_slash_command(
     command: String,
 ) -> Result<serde_json::Value, AppError> {
     let client = {
-        let servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let servers = state
+            .servers
+            .lock()
+            .map_err(|e| AppError::Config(e.to_string()))?;
         let server = servers
             .get(&server_id)
             .ok_or_else(|| AppError::NotFound(format!("Server {} not found", server_id)))?;
         server.client.clone()
     };
 
-    client.execute_command(&channel_id, team_id.as_deref(), &command).await
+    client
+        .execute_command(&channel_id, team_id.as_deref(), &command)
+        .await
 }

@@ -1,13 +1,16 @@
-use tauri::State;
 use crate::errors::AppError;
 use crate::mattermost::types::{SidebarCategory, SidebarCategoryCreate, SidebarCategoryUpdate};
 use crate::state::AppState;
+use tauri::State;
 
 fn get_client_user_id(
     state: &State<'_, AppState>,
     server_id: &str,
 ) -> Result<(crate::mattermost::client::MattermostClient, String), AppError> {
-    let servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+    let servers = state
+        .servers
+        .lock()
+        .map_err(|e| AppError::Config(e.to_string()))?;
     let server = servers
         .get(server_id)
         .ok_or_else(|| AppError::NotFound(format!("Server {} not found", server_id)))?;
@@ -50,7 +53,9 @@ pub async fn create_sidebar_category(
         channel_ids,
         sort_order,
     };
-    client.create_sidebar_category(&user_id, &team_id, &cat).await
+    client
+        .create_sidebar_category(&user_id, &team_id, &cat)
+        .await
 }
 
 #[tauri::command]

@@ -159,6 +159,7 @@ pub struct Reaction {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(dead_code)] // Mattermost API surface, not wired to a command yet
 pub struct CustomEmoji {
     pub id: String,
     pub name: String,
@@ -207,6 +208,7 @@ pub struct UpsertDraftRequest {
 // --- Threads ---
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(dead_code)] // Mattermost API surface, not wired to a command yet
 pub struct ThreadResponse {
     pub order: Vec<String>,
     pub posts: std::collections::HashMap<String, Post>,

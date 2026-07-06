@@ -1,4 +1,3 @@
-use std::sync::Arc;
 use std::time::Duration;
 
 use futures_util::{SinkExt, StreamExt};
@@ -25,13 +24,7 @@ impl WsManager {
     ) -> Self {
         let (shutdown_tx, shutdown_rx) = watch::channel(false);
 
-        tokio::spawn(ws_loop(
-            app_handle,
-            server_id,
-            ws_url,
-            token,
-            shutdown_rx,
-        ));
+        tokio::spawn(ws_loop(app_handle, server_id, ws_url, token, shutdown_rx));
 
         Self { shutdown_tx }
     }
@@ -67,20 +60,26 @@ async fn ws_loop(
         log::info!("[WS:{}] Connecting to {}", server_id, ws_url);
 
         // Emit connection status
-        let _ = app_handle.emit("ws_status", serde_json::json!({
-            "server_id": &server_id,
-            "status": "connecting",
-        }));
+        let _ = app_handle.emit(
+            "ws_status",
+            serde_json::json!({
+                "server_id": &server_id,
+                "status": "connecting",
+            }),
+        );
 
         match connect_async(&ws_url).await {
             Ok((ws_stream, _)) => {
                 log::info!("[WS:{}] Connected", server_id);
                 backoff = Duration::from_secs(1); // Reset backoff on success
 
-                let _ = app_handle.emit("ws_status", serde_json::json!({
-                    "server_id": &server_id,
-                    "status": "connected",
-                }));
+                let _ = app_handle.emit(
+                    "ws_status",
+                    serde_json::json!({
+                        "server_id": &server_id,
+                        "status": "connected",
+                    }),
+                );
 
                 let (mut write, mut read) = ws_stream.split();
 
@@ -141,10 +140,13 @@ async fn ws_loop(
         }
 
         // Emit disconnected status
-        let _ = app_handle.emit("ws_status", serde_json::json!({
-            "server_id": &server_id,
-            "status": "disconnected",
-        }));
+        let _ = app_handle.emit(
+            "ws_status",
+            serde_json::json!({
+                "server_id": &server_id,
+                "status": "disconnected",
+            }),
+        );
 
         if *shutdown_rx.borrow() {
             return;

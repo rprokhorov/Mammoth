@@ -1,12 +1,12 @@
 use serde::Serialize;
-use tauri::{Manager, State, Emitter, WebviewUrl, WebviewWindowBuilder};
+use tauri::{Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder};
 
+use super::servers::update_server_token;
 use crate::errors::AppError;
 use crate::mattermost::client::MattermostClient;
 use crate::mattermost::types::{Team, User};
 use crate::mattermost::websocket::WsManager;
 use crate::state::AppState;
-use super::servers::update_server_token;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct SsoTokenPayload {
@@ -35,7 +35,10 @@ pub async fn login(
     password: String,
 ) -> Result<LoginResponse, AppError> {
     let server_url = {
-        let servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let servers = state
+            .servers
+            .lock()
+            .map_err(|e| AppError::Config(e.to_string()))?;
         let server = servers
             .get(&server_id)
             .ok_or_else(|| AppError::NotFound(format!("Server {} not found", server_id)))?;
@@ -51,7 +54,10 @@ pub async fn login(
     let teams = client.get_teams_for_user(&user.id).await?;
 
     {
-        let mut servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let mut servers = state
+            .servers
+            .lock()
+            .map_err(|e| AppError::Config(e.to_string()))?;
         if let Some(server) = servers.get_mut(&server_id) {
             server.client = client;
             server.current_user = Some(user.clone());
@@ -61,7 +67,10 @@ pub async fn login(
     // Persist token and active server
     let _ = update_server_token(&app_handle, &server_id, Some(token.clone()));
     {
-        let mut active = state.active_server_id.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let mut active = state
+            .active_server_id
+            .lock()
+            .map_err(|e| AppError::Config(e.to_string()))?;
         *active = Some(server_id.clone());
     }
     let _ = super::servers::save_active_server(&app_handle, Some(&server_id));
@@ -77,7 +86,10 @@ pub async fn login_with_token(
     token: String,
 ) -> Result<LoginResponse, AppError> {
     let server_url = {
-        let servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let servers = state
+            .servers
+            .lock()
+            .map_err(|e| AppError::Config(e.to_string()))?;
         let server = servers
             .get(&server_id)
             .ok_or_else(|| AppError::NotFound(format!("Server {} not found", server_id)))?;
@@ -89,7 +101,10 @@ pub async fn login_with_token(
     let teams = client.get_teams_for_user(&user.id).await?;
 
     {
-        let mut servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let mut servers = state
+            .servers
+            .lock()
+            .map_err(|e| AppError::Config(e.to_string()))?;
         if let Some(server) = servers.get_mut(&server_id) {
             server.client = client;
             server.current_user = Some(user.clone());
@@ -99,26 +114,25 @@ pub async fn login_with_token(
     // Persist token and active server
     let _ = update_server_token(&app_handle, &server_id, Some(token.clone()));
     {
-        let mut active = state.active_server_id.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let mut active = state
+            .active_server_id
+            .lock()
+            .map_err(|e| AppError::Config(e.to_string()))?;
         *active = Some(server_id.clone());
     }
     let _ = super::servers::save_active_server(&app_handle, Some(&server_id));
 
-    Ok(LoginResponse {
-        user,
-        teams,
-        token,
-    })
+    Ok(LoginResponse { user, teams, token })
 }
 
 #[tauri::command]
-pub async fn logout(
-    state: State<'_, AppState>,
-    server_id: String,
-) -> Result<(), AppError> {
+pub async fn logout(state: State<'_, AppState>, server_id: String) -> Result<(), AppError> {
     // Clone client out of lock, then await
     let client = {
-        let mut servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let mut servers = state
+            .servers
+            .lock()
+            .map_err(|e| AppError::Config(e.to_string()))?;
         if let Some(server) = servers.get_mut(&server_id) {
             server.current_user = None;
             Some(server.client.clone())
@@ -130,7 +144,10 @@ pub async fn logout(
     if let Some(mut client) = client {
         client.logout().await?;
         // Update the client in state (token cleared)
-        let mut servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let mut servers = state
+            .servers
+            .lock()
+            .map_err(|e| AppError::Config(e.to_string()))?;
         if let Some(server) = servers.get_mut(&server_id) {
             server.client = client;
         }
@@ -140,12 +157,12 @@ pub async fn logout(
 }
 
 #[tauri::command]
-pub async fn get_me(
-    state: State<'_, AppState>,
-    server_id: String,
-) -> Result<User, AppError> {
+pub async fn get_me(state: State<'_, AppState>, server_id: String) -> Result<User, AppError> {
     let client = {
-        let servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let servers = state
+            .servers
+            .lock()
+            .map_err(|e| AppError::Config(e.to_string()))?;
         let server = servers
             .get(&server_id)
             .ok_or_else(|| AppError::NotFound(format!("Server {} not found", server_id)))?;
@@ -161,7 +178,10 @@ pub async fn validate_session(
     server_id: String,
 ) -> Result<bool, AppError> {
     let client = {
-        let servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let servers = state
+            .servers
+            .lock()
+            .map_err(|e| AppError::Config(e.to_string()))?;
         let server = servers
             .get(&server_id)
             .ok_or_else(|| AppError::NotFound(format!("Server {} not found", server_id)))?;
@@ -171,7 +191,10 @@ pub async fn validate_session(
     match client.get_me().await {
         Ok(user) => {
             // Store current_user so list_servers shows connected=true
-            let mut servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+            let mut servers = state
+                .servers
+                .lock()
+                .map_err(|e| AppError::Config(e.to_string()))?;
             if let Some(server) = servers.get_mut(&server_id) {
                 server.current_user = Some(user);
             }
@@ -189,7 +212,10 @@ pub async fn connect_ws(
     server_id: String,
 ) -> Result<(), AppError> {
     let (ws_url, token) = {
-        let servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let servers = state
+            .servers
+            .lock()
+            .map_err(|e| AppError::Config(e.to_string()))?;
         let server = servers
             .get(&server_id)
             .ok_or_else(|| AppError::NotFound(format!("Server {} not found", server_id)))?;
@@ -202,15 +228,13 @@ pub async fn connect_ws(
         (ws_url, token)
     };
 
-    let ws_manager = WsManager::connect(
-        app_handle,
-        server_id.clone(),
-        ws_url,
-        token,
-    );
+    let ws_manager = WsManager::connect(app_handle, server_id.clone(), ws_url, token);
 
     {
-        let mut servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let mut servers = state
+            .servers
+            .lock()
+            .map_err(|e| AppError::Config(e.to_string()))?;
         if let Some(server) = servers.get_mut(&server_id) {
             // Disconnect old WS if any
             if let Some(old) = server.ws_manager.take() {
@@ -224,11 +248,11 @@ pub async fn connect_ws(
 }
 
 #[tauri::command]
-pub async fn disconnect_ws(
-    state: State<'_, AppState>,
-    server_id: String,
-) -> Result<(), AppError> {
-    let mut servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+pub async fn disconnect_ws(state: State<'_, AppState>, server_id: String) -> Result<(), AppError> {
+    let mut servers = state
+        .servers
+        .lock()
+        .map_err(|e| AppError::Config(e.to_string()))?;
     if let Some(server) = servers.get_mut(&server_id) {
         if let Some(ws) = server.ws_manager.take() {
             ws.disconnect();
@@ -249,7 +273,10 @@ pub async fn open_sso_window(
     provider: String,
 ) -> Result<(), AppError> {
     let base_url = {
-        let servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let servers = state
+            .servers
+            .lock()
+            .map_err(|e| AppError::Config(e.to_string()))?;
         let server = servers
             .get(&server_id)
             .ok_or_else(|| AppError::NotFound(format!("Server {} not found", server_id)))?;
@@ -262,7 +289,12 @@ pub async fn open_sso_window(
         "office365" => "oauth/office365/login",
         "openid" => "oauth/openid/login",
         "saml" => "login/sso/saml",
-        _ => return Err(AppError::Config(format!("Unknown SSO provider: {}", provider))),
+        _ => {
+            return Err(AppError::Config(format!(
+                "Unknown SSO provider: {}",
+                provider
+            )))
+        }
     };
 
     let sso_url = format!("{}{}", base_url, sso_path);
@@ -273,7 +305,11 @@ pub async fn open_sso_window(
         let _ = existing.close();
     }
 
-    let title = format!("Sign in with {}{}", provider[..1].to_uppercase(), &provider[1..]);
+    let title = format!(
+        "Sign in with {}{}",
+        provider[..1].to_uppercase(),
+        &provider[1..]
+    );
 
     let sso_done = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
     let sso_done_flag = sso_done.clone();
@@ -282,7 +318,11 @@ pub async fn open_sso_window(
     let _sso_window = WebviewWindowBuilder::new(
         &app_handle,
         "sso-login",
-        WebviewUrl::External(sso_url.parse().map_err(|e| AppError::Config(format!("Invalid SSO URL: {}", e)))?),
+        WebviewUrl::External(
+            sso_url
+                .parse()
+                .map_err(|e| AppError::Config(format!("Invalid SSO URL: {}", e)))?,
+        ),
     )
     .title(&title)
     .inner_size(600.0, 700.0)
@@ -333,7 +373,7 @@ pub async fn open_sso_window(
             // Wait a moment for cookies to be fully set
             tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
 
-            let win = match app2.get_webview_window("sso-login") {
+            let _win = match app2.get_webview_window("sso-login") {
                 Some(w) => w,
                 None => break,
             };
@@ -359,13 +399,19 @@ pub async fn open_sso_window(
 
                 match win.cookies_for_url(cookie_url.clone()) {
                     Ok(cookies) => {
-                        eprintln!("SSO cookies (attempt {}): {} cookies found", attempt, cookies.len());
+                        eprintln!(
+                            "SSO cookies (attempt {}): {} cookies found",
+                            attempt,
+                            cookies.len()
+                        );
                         for cookie in &cookies {
                             eprintln!("  cookie: {} (len={})", cookie.name(), cookie.value().len());
                         }
 
                         // Find MMAUTHTOKEN
-                        if let Some(auth_cookie) = cookies.iter().find(|c| c.name() == "MMAUTHTOKEN") {
+                        if let Some(auth_cookie) =
+                            cookies.iter().find(|c| c.name() == "MMAUTHTOKEN")
+                        {
                             let token = auth_cookie.value().to_string();
                             eprintln!("SSO token extracted from cookie!");
 
@@ -402,7 +448,10 @@ pub async fn complete_sso_login(
     token: String,
 ) -> Result<LoginResponse, AppError> {
     let server_url = {
-        let servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let servers = state
+            .servers
+            .lock()
+            .map_err(|e| AppError::Config(e.to_string()))?;
         let server = servers
             .get(&server_id)
             .ok_or_else(|| AppError::NotFound(format!("Server {} not found", server_id)))?;
@@ -414,7 +463,10 @@ pub async fn complete_sso_login(
     let teams = client.get_teams_for_user(&user.id).await?;
 
     {
-        let mut servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let mut servers = state
+            .servers
+            .lock()
+            .map_err(|e| AppError::Config(e.to_string()))?;
         if let Some(server) = servers.get_mut(&server_id) {
             server.client = client;
             server.current_user = Some(user.clone());
@@ -423,7 +475,10 @@ pub async fn complete_sso_login(
 
     let _ = update_server_token(&app_handle, &server_id, Some(token.clone()));
     {
-        let mut active = state.active_server_id.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let mut active = state
+            .active_server_id
+            .lock()
+            .map_err(|e| AppError::Config(e.to_string()))?;
         *active = Some(server_id.clone());
     }
     let _ = super::servers::save_active_server(&app_handle, Some(&server_id));

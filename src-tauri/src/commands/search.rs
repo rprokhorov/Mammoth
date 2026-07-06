@@ -12,7 +12,10 @@ pub async fn search_posts(
     terms: String,
 ) -> Result<PostList, AppError> {
     let client = {
-        let servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let servers = state
+            .servers
+            .lock()
+            .map_err(|e| AppError::Config(e.to_string()))?;
         let server = servers
             .get(&server_id)
             .ok_or_else(|| AppError::NotFound(format!("Server {} not found", server_id)))?;

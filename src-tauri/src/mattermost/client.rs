@@ -1,8 +1,8 @@
-use reqwest::{Client, header};
+use reqwest::{header, Client};
 use url::Url;
 
-use crate::errors::AppError;
 use super::types::*;
+use crate::errors::AppError;
 
 #[derive(Debug, Clone)]
 pub struct MattermostClient {
@@ -18,8 +18,8 @@ impl MattermostClient {
         if !url.ends_with('/') {
             url.push('/');
         }
-        let base_url = Url::parse(&url)
-            .map_err(|e| AppError::Config(format!("Invalid server URL: {}", e)))?;
+        let base_url =
+            Url::parse(&url).map_err(|e| AppError::Config(format!("Invalid server URL: {}", e)))?;
 
         let http = Client::builder()
             .timeout(std::time::Duration::from_secs(10))
@@ -39,6 +39,7 @@ impl MattermostClient {
         })
     }
 
+    #[allow(dead_code)] // Mattermost API surface, not wired to a command yet
     pub fn with_token(mut self, token: String) -> Self {
         self.token = Some(token);
         self
@@ -89,11 +90,7 @@ impl MattermostClient {
     }
 
     pub async fn ping(&self) -> Result<bool, AppError> {
-        let resp = self
-            .http
-            .get(self.api_url("/system/ping"))
-            .send()
-            .await?;
+        let resp = self.http.get(self.api_url("/system/ping")).send().await?;
 
         Ok(resp.status().is_success())
     }
@@ -199,10 +196,7 @@ impl MattermostClient {
         team_id: &str,
     ) -> Result<Vec<Channel>, AppError> {
         let resp = self
-            .get_authenticated(&format!(
-                "/users/{}/teams/{}/channels",
-                user_id, team_id
-            ))
+            .get_authenticated(&format!("/users/{}/teams/{}/channels", user_id, team_id))
             .await?;
         let channels: Vec<Channel> = resp.json().await?;
         Ok(channels)
@@ -216,6 +210,7 @@ impl MattermostClient {
         Ok(channel)
     }
 
+    #[allow(dead_code)] // Mattermost API surface, not wired to a command yet
     pub async fn get_channel_members(
         &self,
         channel_id: &str,
@@ -232,11 +227,7 @@ impl MattermostClient {
         Ok(members)
     }
 
-    pub async fn view_channel(
-        &self,
-        user_id: &str,
-        channel_id: &str,
-    ) -> Result<(), AppError> {
+    pub async fn view_channel(&self, user_id: &str, channel_id: &str) -> Result<(), AppError> {
         let auth = self.auth_header()?;
         let body = serde_json::json!({
             "channel_id": channel_id,
@@ -314,6 +305,7 @@ impl MattermostClient {
         Some(attrs)
     }
 
+    #[allow(dead_code)] // Mattermost API surface, not wired to a command yet
     pub async fn get_user_raw(&self, user_id: &str) -> Result<serde_json::Value, AppError> {
         let resp = self
             .get_authenticated(&format!("/users/{}", user_id))
@@ -438,18 +430,17 @@ impl MattermostClient {
         if !resp.status().is_success() {
             let status = resp.status().as_u16();
             let msg = resp.text().await.unwrap_or_default();
-            return Err(AppError::Api { status, message: msg });
+            return Err(AppError::Api {
+                status,
+                message: msg,
+            });
         }
 
         let post: Post = resp.json().await?;
         Ok(post)
     }
 
-    pub async fn update_post(
-        &self,
-        post_id: &str,
-        message: &str,
-    ) -> Result<Post, AppError> {
+    pub async fn update_post(&self, post_id: &str, message: &str) -> Result<Post, AppError> {
         let auth = self.auth_header()?;
         let body = serde_json::json!({
             "id": post_id,
@@ -467,7 +458,10 @@ impl MattermostClient {
         if !resp.status().is_success() {
             let status = resp.status().as_u16();
             let msg = resp.text().await.unwrap_or_default();
-            return Err(AppError::Api { status, message: msg });
+            return Err(AppError::Api {
+                status,
+                message: msg,
+            });
         }
 
         let post: Post = resp.json().await?;
@@ -486,7 +480,10 @@ impl MattermostClient {
         if !resp.status().is_success() {
             let status = resp.status().as_u16();
             let msg = resp.text().await.unwrap_or_default();
-            return Err(AppError::Api { status, message: msg });
+            return Err(AppError::Api {
+                status,
+                message: msg,
+            });
         }
 
         Ok(())
@@ -501,12 +498,11 @@ impl MattermostClient {
         command: &str,
     ) -> Result<Vec<super::types::SlashCommand>, AppError> {
         let auth = self.auth_header()?;
-        let encoded_command: String = url::form_urlencoded::byte_serialize(command.as_bytes()).collect();
+        let encoded_command: String =
+            url::form_urlencoded::byte_serialize(command.as_bytes()).collect();
         let url = self.api_url(&format!(
             "/teams/{}/commands/autocomplete_suggestions?channel_id={}&user_input={}",
-            team_id,
-            channel_id,
-            encoded_command,
+            team_id, channel_id, encoded_command,
         ));
         let resp = self
             .http
@@ -518,7 +514,10 @@ impl MattermostClient {
         if !resp.status().is_success() {
             let status = resp.status().as_u16();
             let msg = resp.text().await.unwrap_or_default();
-            return Err(AppError::Api { status, message: msg });
+            return Err(AppError::Api {
+                status,
+                message: msg,
+            });
         }
 
         let commands: Vec<super::types::SlashCommand> = resp.json().await?;
@@ -553,7 +552,10 @@ impl MattermostClient {
         if !resp.status().is_success() {
             let status = resp.status().as_u16();
             let msg = resp.text().await.unwrap_or_default();
-            return Err(AppError::Api { status, message: msg });
+            return Err(AppError::Api {
+                status,
+                message: msg,
+            });
         }
 
         let result: serde_json::Value = resp.json().await?;
@@ -571,8 +573,7 @@ impl MattermostClient {
         let auth = self.auth_header()?;
         let file_bytes = tokio::fs::read(file_path).await.map_err(AppError::Io)?;
 
-        let part = reqwest::multipart::Part::bytes(file_bytes)
-            .file_name(file_name.to_string());
+        let part = reqwest::multipart::Part::bytes(file_bytes).file_name(file_name.to_string());
         let form = reqwest::multipart::Form::new()
             .text("channel_id", channel_id.to_string())
             .part("files", part);
@@ -588,7 +589,10 @@ impl MattermostClient {
         if !resp.status().is_success() {
             let status = resp.status().as_u16();
             let msg = resp.text().await.unwrap_or_default();
-            return Err(AppError::Api { status, message: msg });
+            return Err(AppError::Api {
+                status,
+                message: msg,
+            });
         }
 
         #[derive(serde::Deserialize)]
@@ -619,7 +623,10 @@ impl MattermostClient {
         if !resp.status().is_success() {
             let status = resp.status().as_u16();
             let msg = resp.text().await.unwrap_or_default();
-            return Err(AppError::Api { status, message: msg });
+            return Err(AppError::Api {
+                status,
+                message: msg,
+            });
         }
 
         let bytes = resp.bytes().await.map_err(AppError::Network)?;
@@ -630,6 +637,7 @@ impl MattermostClient {
         self.api_url(&format!("/files/{}", file_id))
     }
 
+    #[allow(dead_code)] // Mattermost API surface, not wired to a command yet
     pub fn file_thumbnail_url(&self, file_id: &str) -> String {
         self.api_url(&format!("/files/{}/thumbnail", file_id))
     }
@@ -646,7 +654,10 @@ impl MattermostClient {
         if !resp.status().is_success() {
             let status = resp.status().as_u16();
             let msg = resp.text().await.unwrap_or_default();
-            return Err(AppError::Api { status, message: msg });
+            return Err(AppError::Api {
+                status,
+                message: msg,
+            });
         }
 
         let bytes = resp.bytes().await.map_err(AppError::Network)?;
@@ -655,11 +666,7 @@ impl MattermostClient {
 
     // --- Search ---
 
-    pub async fn search_posts(
-        &self,
-        team_id: &str,
-        terms: &str,
-    ) -> Result<PostList, AppError> {
+    pub async fn search_posts(&self, team_id: &str, terms: &str) -> Result<PostList, AppError> {
         let auth = self.auth_header()?;
         let body = serde_json::json!({
             "terms": terms,
@@ -676,7 +683,10 @@ impl MattermostClient {
         if !resp.status().is_success() {
             let status = resp.status().as_u16();
             let msg = resp.text().await.unwrap_or_default();
-            return Err(AppError::Api { status, message: msg });
+            return Err(AppError::Api {
+                status,
+                message: msg,
+            });
         }
 
         let results: PostList = resp.json().await?;
@@ -685,10 +695,7 @@ impl MattermostClient {
 
     // --- Threads ---
 
-    pub async fn get_post_thread(
-        &self,
-        post_id: &str,
-    ) -> Result<PostList, AppError> {
+    pub async fn get_post_thread(&self, post_id: &str) -> Result<PostList, AppError> {
         let resp = self
             .get_authenticated(&format!("/posts/{}/thread", post_id))
             .await?;
@@ -749,7 +756,10 @@ impl MattermostClient {
         if !resp.status().is_success() {
             let status = resp.status().as_u16();
             let msg = resp.text().await.unwrap_or_default();
-            return Err(AppError::Api { status, message: msg });
+            return Err(AppError::Api {
+                status,
+                message: msg,
+            });
         }
         Ok(())
     }
@@ -774,7 +784,10 @@ impl MattermostClient {
         if !resp.status().is_success() {
             let status = resp.status().as_u16();
             let msg = resp.text().await.unwrap_or_default();
-            return Err(AppError::Api { status, message: msg });
+            return Err(AppError::Api {
+                status,
+                message: msg,
+            });
         }
         Ok(())
     }
@@ -800,7 +813,10 @@ impl MattermostClient {
         if !resp.status().is_success() {
             let status = resp.status().as_u16();
             let msg = resp.text().await.unwrap_or_default();
-            return Err(AppError::Api { status, message: msg });
+            return Err(AppError::Api {
+                status,
+                message: msg,
+            });
         }
         Ok(())
     }
@@ -841,7 +857,10 @@ impl MattermostClient {
         if !resp.status().is_success() {
             let status = resp.status().as_u16();
             let msg = resp.text().await.unwrap_or_default();
-            return Err(AppError::Api { status, message: msg });
+            return Err(AppError::Api {
+                status,
+                message: msg,
+            });
         }
 
         let channel: Channel = resp.json().await?;
@@ -865,7 +884,10 @@ impl MattermostClient {
         if !resp.status().is_success() {
             let status = resp.status().as_u16();
             let msg = resp.text().await.unwrap_or_default();
-            return Err(AppError::Api { status, message: msg });
+            return Err(AppError::Api {
+                status,
+                message: msg,
+            });
         }
 
         let channel: Channel = resp.json().await?;
@@ -884,7 +906,10 @@ impl MattermostClient {
         if !resp.status().is_success() {
             let status = resp.status().as_u16();
             let msg = resp.text().await.unwrap_or_default();
-            return Err(AppError::Api { status, message: msg });
+            return Err(AppError::Api {
+                status,
+                message: msg,
+            });
         }
         Ok(())
     }
@@ -907,16 +932,15 @@ impl MattermostClient {
         if !resp.status().is_success() {
             let status = resp.status().as_u16();
             let msg = resp.text().await.unwrap_or_default();
-            return Err(AppError::Api { status, message: msg });
+            return Err(AppError::Api {
+                status,
+                message: msg,
+            });
         }
         Ok(())
     }
 
-    pub async fn leave_channel(
-        &self,
-        channel_id: &str,
-        user_id: &str,
-    ) -> Result<(), AppError> {
+    pub async fn leave_channel(&self, channel_id: &str, user_id: &str) -> Result<(), AppError> {
         let auth = self.auth_header()?;
         let resp = self
             .http
@@ -928,7 +952,10 @@ impl MattermostClient {
         if !resp.status().is_success() {
             let status = resp.status().as_u16();
             let msg = resp.text().await.unwrap_or_default();
-            return Err(AppError::Api { status, message: msg });
+            return Err(AppError::Api {
+                status,
+                message: msg,
+            });
         }
         Ok(())
     }
@@ -958,7 +985,10 @@ impl MattermostClient {
         if !resp.status().is_success() {
             let status = resp.status().as_u16();
             let msg = resp.text().await.unwrap_or_default();
-            return Err(AppError::Api { status, message: msg });
+            return Err(AppError::Api {
+                status,
+                message: msg,
+            });
         }
         Ok(())
     }
@@ -983,7 +1013,10 @@ impl MattermostClient {
         if !resp.status().is_success() {
             let status = resp.status().as_u16();
             let msg = resp.text().await.unwrap_or_default();
-            return Err(AppError::Api { status, message: msg });
+            return Err(AppError::Api {
+                status,
+                message: msg,
+            });
         }
         Ok(())
     }
@@ -1010,7 +1043,10 @@ impl MattermostClient {
         if !resp.status().is_success() {
             let status = resp.status().as_u16();
             let msg = resp.text().await.unwrap_or_default();
-            return Err(AppError::Api { status, message: msg });
+            return Err(AppError::Api {
+                status,
+                message: msg,
+            });
         }
         Ok(())
     }
@@ -1027,7 +1063,10 @@ impl MattermostClient {
         if !resp.status().is_success() {
             let status = resp.status().as_u16();
             let msg = resp.text().await.unwrap_or_default();
-            return Err(AppError::Api { status, message: msg });
+            return Err(AppError::Api {
+                status,
+                message: msg,
+            });
         }
         Ok(())
     }
@@ -1093,7 +1132,10 @@ impl MattermostClient {
         if !resp.status().is_success() {
             let status = resp.status().as_u16();
             let msg = resp.text().await.unwrap_or_default();
-            return Err(AppError::Api { status, message: msg });
+            return Err(AppError::Api {
+                status,
+                message: msg,
+            });
         }
         Ok(())
     }
@@ -1116,7 +1158,10 @@ impl MattermostClient {
         if !resp.status().is_success() {
             let status = resp.status().as_u16();
             let msg = resp.text().await.unwrap_or_default();
-            return Err(AppError::Api { status, message: msg });
+            return Err(AppError::Api {
+                status,
+                message: msg,
+            });
         }
         Ok(())
     }
@@ -1140,7 +1185,12 @@ impl MattermostClient {
 
     // --- Emoji ---
 
-    pub async fn get_custom_emoji_list(&self, page: u32, per_page: u32) -> Result<Vec<CustomEmoji>, AppError> {
+    #[allow(dead_code)] // Mattermost API surface, not wired to a command yet
+    pub async fn get_custom_emoji_list(
+        &self,
+        page: u32,
+        per_page: u32,
+    ) -> Result<Vec<CustomEmoji>, AppError> {
         let resp = self
             .get_authenticated(&format!("/emoji?page={}&per_page={}", page, per_page))
             .await?;
@@ -1148,13 +1198,18 @@ impl MattermostClient {
         Ok(emojis)
     }
 
+    #[allow(dead_code)] // Mattermost API surface, not wired to a command yet
     pub fn custom_emoji_image_url(&self, emoji_id: &str) -> String {
         self.api_url(&format!("/emoji/{}/image", emoji_id))
     }
 
     // --- Profile ---
 
-    pub async fn update_user(&self, user_id: &str, patch: serde_json::Value) -> Result<User, AppError> {
+    pub async fn update_user(
+        &self,
+        user_id: &str,
+        patch: serde_json::Value,
+    ) -> Result<User, AppError> {
         let auth = self.auth_header()?;
         let resp = self
             .http
@@ -1167,14 +1222,21 @@ impl MattermostClient {
         if !resp.status().is_success() {
             let status = resp.status().as_u16();
             let msg = resp.text().await.unwrap_or_default();
-            return Err(AppError::Api { status, message: msg });
+            return Err(AppError::Api {
+                status,
+                message: msg,
+            });
         }
 
         let user: User = resp.json().await?;
         Ok(user)
     }
 
-    pub async fn upload_profile_image(&self, user_id: &str, file_path: &str) -> Result<(), AppError> {
+    pub async fn upload_profile_image(
+        &self,
+        user_id: &str,
+        file_path: &str,
+    ) -> Result<(), AppError> {
         let auth = self.auth_header()?;
         let file_bytes = tokio::fs::read(file_path).await.map_err(AppError::Io)?;
         let file_name = std::path::Path::new(file_path)
@@ -1200,7 +1262,10 @@ impl MattermostClient {
         if !resp.status().is_success() {
             let status = resp.status().as_u16();
             let msg = resp.text().await.unwrap_or_default();
-            return Err(AppError::Api { status, message: msg });
+            return Err(AppError::Api {
+                status,
+                message: msg,
+            });
         }
         Ok(())
     }
@@ -1230,7 +1295,10 @@ impl MattermostClient {
         if !resp.status().is_success() {
             let status_code = resp.status().as_u16();
             let msg = resp.text().await.unwrap_or_default();
-            return Err(AppError::Api { status: status_code, message: msg });
+            return Err(AppError::Api {
+                status: status_code,
+                message: msg,
+            });
         }
 
         let result: UserStatus = resp.json().await?;
@@ -1265,7 +1333,10 @@ impl MattermostClient {
         if !resp.status().is_success() {
             let status = resp.status().as_u16();
             let msg = resp.text().await.unwrap_or_default();
-            return Err(AppError::Api { status, message: msg });
+            return Err(AppError::Api {
+                status,
+                message: msg,
+            });
         }
         Ok(())
     }
@@ -1282,7 +1353,10 @@ impl MattermostClient {
         if !resp.status().is_success() {
             let status = resp.status().as_u16();
             let msg = resp.text().await.unwrap_or_default();
-            return Err(AppError::Api { status, message: msg });
+            return Err(AppError::Api {
+                status,
+                message: msg,
+            });
         }
         Ok(())
     }
@@ -1308,7 +1382,10 @@ impl MattermostClient {
             .get_authenticated(&format!("/channels/{}/members/{}", channel_id, user_id))
             .await?;
         let member: serde_json::Value = resp.json().await?;
-        Ok(member.get("last_viewed_at").and_then(|v| v.as_i64()).unwrap_or(0))
+        Ok(member
+            .get("last_viewed_at")
+            .and_then(|v| v.as_i64())
+            .unwrap_or(0))
     }
 
     // --- Channel Notify Props ---
@@ -1345,11 +1422,20 @@ impl MattermostClient {
             serde_json::Value::Object(map) => map,
             _ => serde_json::Map::new(),
         };
-        body.insert("channel_id".to_string(), serde_json::Value::String(channel_id.to_string()));
-        body.insert("user_id".to_string(), serde_json::Value::String(user_id.to_string()));
+        body.insert(
+            "channel_id".to_string(),
+            serde_json::Value::String(channel_id.to_string()),
+        );
+        body.insert(
+            "user_id".to_string(),
+            serde_json::Value::String(user_id.to_string()),
+        );
         let resp = self
             .http
-            .put(self.api_url(&format!("/channels/{}/members/{}/notify_props", channel_id, user_id)))
+            .put(self.api_url(&format!(
+                "/channels/{}/members/{}/notify_props",
+                channel_id, user_id
+            )))
             .header(header::AUTHORIZATION, &auth)
             .json(&serde_json::Value::Object(body))
             .send()
@@ -1358,7 +1444,10 @@ impl MattermostClient {
         if !resp.status().is_success() {
             let status = resp.status().as_u16();
             let msg = resp.text().await.unwrap_or_default();
-            return Err(AppError::Api { status, message: msg });
+            return Err(AppError::Api {
+                status,
+                message: msg,
+            });
         }
         Ok(())
     }
@@ -1394,7 +1483,10 @@ impl MattermostClient {
         if !resp.status().is_success() {
             let status = resp.status().as_u16();
             let msg = resp.text().await.unwrap_or_default();
-            return Err(AppError::Api { status, message: msg });
+            return Err(AppError::Api {
+                status,
+                message: msg,
+            });
         }
         Ok(())
     }
@@ -1416,7 +1508,10 @@ impl MattermostClient {
         if !resp.status().is_success() {
             let status = resp.status().as_u16();
             let msg = resp.text().await.unwrap_or_default();
-            return Err(AppError::Api { status, message: msg });
+            return Err(AppError::Api {
+                status,
+                message: msg,
+            });
         }
         Ok(())
     }
@@ -1439,8 +1534,9 @@ impl MattermostClient {
         let categories: Vec<SidebarCategory> = serde_json::from_value(
             body.get("categories")
                 .cloned()
-                .unwrap_or(serde_json::Value::Array(vec![]))
-        ).map_err(|e| AppError::Config(format!("Failed to parse sidebar categories: {}", e)))?;
+                .unwrap_or(serde_json::Value::Array(vec![])),
+        )
+        .map_err(|e| AppError::Config(format!("Failed to parse sidebar categories: {}", e)))?;
         Ok(categories)
     }
 
@@ -1465,7 +1561,10 @@ impl MattermostClient {
         if !resp.status().is_success() {
             let status = resp.status().as_u16();
             let msg = resp.text().await.unwrap_or_default();
-            return Err(AppError::Api { status, message: msg });
+            return Err(AppError::Api {
+                status,
+                message: msg,
+            });
         }
 
         let created: SidebarCategory = resp.json().await?;
@@ -1494,7 +1593,10 @@ impl MattermostClient {
         if !resp.status().is_success() {
             let status = resp.status().as_u16();
             let msg = resp.text().await.unwrap_or_default();
-            return Err(AppError::Api { status, message: msg });
+            return Err(AppError::Api {
+                status,
+                message: msg,
+            });
         }
 
         let updated: SidebarCategory = resp.json().await?;
@@ -1521,23 +1623,36 @@ impl MattermostClient {
         if !resp.status().is_success() {
             let status = resp.status().as_u16();
             let msg = resp.text().await.unwrap_or_default();
-            return Err(AppError::Api { status, message: msg });
+            return Err(AppError::Api {
+                status,
+                message: msg,
+            });
         }
         Ok(())
     }
 
-    pub async fn get_custom_emojis(&self, page: u32, per_page: u32) -> Result<Vec<serde_json::Value>, AppError> {
+    pub async fn get_custom_emojis(
+        &self,
+        page: u32,
+        per_page: u32,
+    ) -> Result<Vec<serde_json::Value>, AppError> {
         let auth = self.auth_header()?;
         let resp = self
             .http_slow
-            .get(self.api_url(&format!("/emoji?page={}&per_page={}&sort=name", page, per_page)))
+            .get(self.api_url(&format!(
+                "/emoji?page={}&per_page={}&sort=name",
+                page, per_page
+            )))
             .header(header::AUTHORIZATION, &auth)
             .send()
             .await?;
         if !resp.status().is_success() {
             let status = resp.status().as_u16();
             let msg = resp.text().await.unwrap_or_default();
-            return Err(AppError::Api { status, message: msg });
+            return Err(AppError::Api {
+                status,
+                message: msg,
+            });
         }
         let list: Vec<serde_json::Value> = resp.json().await.map_err(AppError::Network)?;
         Ok(list)
@@ -1554,7 +1669,10 @@ impl MattermostClient {
         if !resp.status().is_success() {
             let status = resp.status().as_u16();
             let msg = resp.text().await.unwrap_or_default();
-            return Err(AppError::Api { status, message: msg });
+            return Err(AppError::Api {
+                status,
+                message: msg,
+            });
         }
         let bytes = resp.bytes().await.map_err(AppError::Network)?;
         Ok(bytes.to_vec())
@@ -1571,7 +1689,10 @@ impl MattermostClient {
         if !resp.status().is_success() {
             let status = resp.status().as_u16();
             let msg = resp.text().await.unwrap_or_default();
-            return Err(AppError::Api { status, message: msg });
+            return Err(AppError::Api {
+                status,
+                message: msg,
+            });
         }
         let bytes = resp.bytes().await.map_err(AppError::Network)?;
         Ok(bytes.to_vec())
@@ -1614,7 +1735,10 @@ impl MattermostClient {
         if !resp.status().is_success() {
             let status = resp.status().as_u16();
             let msg = resp.text().await.unwrap_or_default();
-            return Err(AppError::Api { status, message: msg });
+            return Err(AppError::Api {
+                status,
+                message: msg,
+            });
         }
         let result: serde_json::Value = resp.json().await.unwrap_or(serde_json::Value::Null);
         Ok(result)
@@ -1638,7 +1762,10 @@ impl MattermostClient {
         if !resp.status().is_success() {
             let status = resp.status().as_u16();
             let msg = resp.text().await.unwrap_or_default();
-            return Err(AppError::Api { status, message: msg });
+            return Err(AppError::Api {
+                status,
+                message: msg,
+            });
         }
         Ok(resp.json().await?)
     }
@@ -1661,17 +1788,16 @@ impl MattermostClient {
         if !resp.status().is_success() {
             let status = resp.status().as_u16();
             let msg = resp.text().await.unwrap_or_default();
-            return Err(AppError::Api { status, message: msg });
+            return Err(AppError::Api {
+                status,
+                message: msg,
+            });
         }
         Ok(resp.json().await?)
     }
 
     /// Search users by term (username, first/last name, nickname) — searches all users
-    pub async fn search_users(
-        &self,
-        team_id: &str,
-        term: &str,
-    ) -> Result<Vec<User>, AppError> {
+    pub async fn search_users(&self, team_id: &str, term: &str) -> Result<Vec<User>, AppError> {
         let auth = self.auth_header()?;
         let body = serde_json::json!({
             "term": term,
@@ -1688,7 +1814,10 @@ impl MattermostClient {
         if !resp.status().is_success() {
             let status = resp.status().as_u16();
             let msg = resp.text().await.unwrap_or_default();
-            return Err(AppError::Api { status, message: msg });
+            return Err(AppError::Api {
+                status,
+                message: msg,
+            });
         }
         Ok(resp.json().await?)
     }
@@ -1711,7 +1840,10 @@ impl MattermostClient {
         if !resp.status().is_success() {
             let status = resp.status().as_u16();
             let msg = resp.text().await.unwrap_or_default();
-            return Err(AppError::Api { status, message: msg });
+            return Err(AppError::Api {
+                status,
+                message: msg,
+            });
         }
         // API returns { users: [...], out_of_channel: [...] }
         let val: serde_json::Value = resp.json().await?;
@@ -1750,7 +1882,10 @@ impl MattermostClient {
         if !resp.status().is_success() {
             let status = resp.status().as_u16();
             let msg = resp.text().await.unwrap_or_default();
-            return Err(AppError::Api { status, message: msg });
+            return Err(AppError::Api {
+                status,
+                message: msg,
+            });
         }
         let val: serde_json::Value = resp.json().await?;
         let in_channel = val["users"]
@@ -1795,17 +1930,28 @@ impl MattermostClient {
         if !resp.status().is_success() {
             let status = resp.status().as_u16();
             let msg = resp.text().await.unwrap_or_default();
-            return Err(AppError::Api { status, message: msg });
+            return Err(AppError::Api {
+                status,
+                message: msg,
+            });
         }
         Ok(())
     }
 
-    pub async fn delete_draft(&self, user_id: &str, channel_id: &str, root_id: &str) -> Result<(), AppError> {
+    pub async fn delete_draft(
+        &self,
+        user_id: &str,
+        channel_id: &str,
+        root_id: &str,
+    ) -> Result<(), AppError> {
         let auth = self.auth_header()?;
         let path = if root_id.is_empty() {
             format!("/users/{}/channels/{}/drafts", user_id, channel_id)
         } else {
-            format!("/users/{}/channels/{}/drafts?root_id={}", user_id, channel_id, root_id)
+            format!(
+                "/users/{}/channels/{}/drafts?root_id={}",
+                user_id, channel_id, root_id
+            )
         };
         let resp = self
             .http
@@ -1817,7 +1963,10 @@ impl MattermostClient {
         if !resp.status().is_success() {
             let status = resp.status().as_u16();
             let msg = resp.text().await.unwrap_or_default();
-            return Err(AppError::Api { status, message: msg });
+            return Err(AppError::Api {
+                status,
+                message: msg,
+            });
         }
         Ok(())
     }

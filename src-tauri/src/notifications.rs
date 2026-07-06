@@ -8,14 +8,14 @@
 
 #![allow(deprecated)] // NSUserNotification is deprecated but functional on macOS
 
-use std::sync::{Mutex, OnceLock};
 use objc2::rc::Retained;
 use objc2::runtime::{AnyObject, ProtocolObject};
 use objc2::{define_class, msg_send, AllocAnyThread};
 use objc2_foundation::{
-    NSDictionary, NSObject, NSObjectProtocol, NSString,
-    NSUserNotification, NSUserNotificationCenter, NSUserNotificationCenterDelegate,
+    NSDictionary, NSObject, NSObjectProtocol, NSString, NSUserNotification,
+    NSUserNotificationCenter, NSUserNotificationCenterDelegate,
 };
+use std::sync::{Mutex, OnceLock};
 use tauri::{AppHandle, Emitter, Manager};
 
 /// Stored app handle for use in the delegate callback.

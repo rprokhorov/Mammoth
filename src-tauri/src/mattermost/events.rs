@@ -43,6 +43,7 @@ pub struct WsResponse {
     #[serde(default)]
     pub status: String,
     #[serde(default)]
+    #[allow(dead_code)]
     pub seq_reply: i64,
     #[serde(default)]
     pub error: Option<serde_json::Value>,

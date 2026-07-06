@@ -10,7 +10,10 @@ pub async fn get_user_profile(
     user_id: String,
 ) -> Result<serde_json::Value, AppError> {
     let (client, token) = {
-        let servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let servers = state
+            .servers
+            .lock()
+            .map_err(|e| AppError::Config(e.to_string()))?;
         let server = servers
             .get(&server_id)
             .ok_or_else(|| AppError::NotFound("Server not found".into()))?;
@@ -62,7 +65,10 @@ pub async fn update_profile(
     position: Option<String>,
 ) -> Result<serde_json::Value, AppError> {
     let (client, current_user_id) = {
-        let servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let servers = state
+            .servers
+            .lock()
+            .map_err(|e| AppError::Config(e.to_string()))?;
         let server = servers
             .get(&server_id)
             .ok_or_else(|| AppError::NotFound("Server not found".into()))?;
@@ -110,7 +116,10 @@ pub async fn upload_avatar(
     file_path: String,
 ) -> Result<(), AppError> {
     let (client, current_user_id) = {
-        let servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let servers = state
+            .servers
+            .lock()
+            .map_err(|e| AppError::Config(e.to_string()))?;
         let server = servers
             .get(&server_id)
             .ok_or_else(|| AppError::NotFound("Server not found".into()))?;
@@ -122,7 +131,9 @@ pub async fn upload_avatar(
         (server.client.clone(), uid)
     };
 
-    client.upload_profile_image(&current_user_id, &file_path).await
+    client
+        .upload_profile_image(&current_user_id, &file_path)
+        .await
 }
 
 #[tauri::command]
@@ -131,13 +142,20 @@ pub async fn get_profile_image_url(
     server_id: String,
     user_id: String,
 ) -> Result<String, AppError> {
-    let servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+    let servers = state
+        .servers
+        .lock()
+        .map_err(|e| AppError::Config(e.to_string()))?;
     let server = servers
         .get(&server_id)
         .ok_or_else(|| AppError::NotFound("Server not found".into()))?;
     let token = server.client.token().unwrap_or_default().to_string();
 
-    Ok(format!("{}?_t={}", server.client.profile_image_url(&user_id), token))
+    Ok(format!(
+        "{}?_t={}",
+        server.client.profile_image_url(&user_id),
+        token
+    ))
 }
 
 #[tauri::command]
@@ -147,7 +165,10 @@ pub async fn set_user_status(
     status: String,
 ) -> Result<serde_json::Value, AppError> {
     let (client, current_user_id) = {
-        let servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let servers = state
+            .servers
+            .lock()
+            .map_err(|e| AppError::Config(e.to_string()))?;
         let server = servers
             .get(&server_id)
             .ok_or_else(|| AppError::NotFound("Server not found".into()))?;

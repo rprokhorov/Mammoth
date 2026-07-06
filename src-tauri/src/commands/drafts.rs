@@ -1,5 +1,5 @@
-use tauri::State;
 use serde::{Deserialize, Serialize};
+use tauri::State;
 
 use crate::errors::AppError;
 use crate::mattermost::types::{Draft, UpsertDraftRequest};
@@ -20,7 +20,10 @@ pub async fn get_drafts(
     server_id: String,
 ) -> Result<Vec<DraftData>, AppError> {
     let (client, user_id) = {
-        let servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let servers = state
+            .servers
+            .lock()
+            .map_err(|e| AppError::Config(e.to_string()))?;
         let server = servers
             .get(&server_id)
             .ok_or_else(|| AppError::NotFound(format!("Server {} not found", server_id)))?;
@@ -55,7 +58,10 @@ pub async fn upsert_draft(
     message: String,
 ) -> Result<(), AppError> {
     let client = {
-        let servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let servers = state
+            .servers
+            .lock()
+            .map_err(|e| AppError::Config(e.to_string()))?;
         let server = servers
             .get(&server_id)
             .ok_or_else(|| AppError::NotFound(format!("Server {} not found", server_id)))?;
@@ -81,7 +87,10 @@ pub async fn delete_draft(
     root_id: String,
 ) -> Result<(), AppError> {
     let (client, user_id) = {
-        let servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let servers = state
+            .servers
+            .lock()
+            .map_err(|e| AppError::Config(e.to_string()))?;
         let server = servers
             .get(&server_id)
             .ok_or_else(|| AppError::NotFound(format!("Server {} not found", server_id)))?;

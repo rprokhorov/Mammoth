@@ -1,12 +1,15 @@
-use tauri::State;
 use crate::errors::AppError;
 use crate::state::AppState;
+use tauri::State;
 
 fn get_client_and_user(
     state: &State<'_, AppState>,
     server_id: &str,
 ) -> Result<(crate::mattermost::client::MattermostClient, String), AppError> {
-    let servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+    let servers = state
+        .servers
+        .lock()
+        .map_err(|e| AppError::Config(e.to_string()))?;
     let server = servers
         .get(server_id)
         .ok_or_else(|| AppError::NotFound(format!("Server {} not found", server_id)))?;
@@ -50,7 +53,9 @@ pub async fn get_channel_notify_props(
     channel_id: String,
 ) -> Result<serde_json::Value, AppError> {
     let (client, user_id) = get_client_and_user(&state, &server_id)?;
-    let props = client.get_channel_notify_props(&channel_id, &user_id).await?;
+    let props = client
+        .get_channel_notify_props(&channel_id, &user_id)
+        .await?;
     Ok(props)
 }
 

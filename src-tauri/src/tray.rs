@@ -9,7 +9,9 @@ fn load_png_as_rgba(png_bytes: &[u8]) -> (Vec<u8>, u32, u32) {
     let decoder = png::Decoder::new(std::io::Cursor::new(png_bytes));
     let mut reader = decoder.read_info().expect("Failed to read PNG info");
     let mut buf = vec![0; reader.output_buffer_size()];
-    let info = reader.next_frame(&mut buf).expect("Failed to decode PNG frame");
+    let info = reader
+        .next_frame(&mut buf)
+        .expect("Failed to decode PNG frame");
     buf.truncate(info.buffer_size());
     (buf, info.width, info.height)
 }

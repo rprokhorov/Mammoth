@@ -11,7 +11,10 @@ pub async fn get_post_thread(
     post_id: String,
 ) -> Result<PostList, AppError> {
     let client = {
-        let servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let servers = state
+            .servers
+            .lock()
+            .map_err(|e| AppError::Config(e.to_string()))?;
         let server = servers
             .get(&server_id)
             .ok_or_else(|| AppError::NotFound(format!("Server {} not found", server_id)))?;
@@ -30,7 +33,10 @@ pub async fn get_user_threads(
     per_page: u32,
 ) -> Result<UserThreadList, AppError> {
     let (client, user_id) = {
-        let servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let servers = state
+            .servers
+            .lock()
+            .map_err(|e| AppError::Config(e.to_string()))?;
         let server = servers
             .get(&server_id)
             .ok_or_else(|| AppError::NotFound(format!("Server {} not found", server_id)))?;
@@ -42,7 +48,9 @@ pub async fn get_user_threads(
         (server.client.clone(), user_id)
     };
 
-    client.get_threads_for_user(&user_id, &team_id, page, per_page).await
+    client
+        .get_threads_for_user(&user_id, &team_id, page, per_page)
+        .await
 }
 
 #[tauri::command]
@@ -53,7 +61,10 @@ pub async fn get_thread(
     thread_id: String,
 ) -> Result<UserThread, AppError> {
     let (client, user_id) = {
-        let servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let servers = state
+            .servers
+            .lock()
+            .map_err(|e| AppError::Config(e.to_string()))?;
         let server = servers
             .get(&server_id)
             .ok_or_else(|| AppError::NotFound(format!("Server {} not found", server_id)))?;
@@ -76,7 +87,10 @@ pub async fn follow_thread(
     thread_id: String,
 ) -> Result<(), AppError> {
     let (client, user_id) = {
-        let servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let servers = state
+            .servers
+            .lock()
+            .map_err(|e| AppError::Config(e.to_string()))?;
         let server = servers
             .get(&server_id)
             .ok_or_else(|| AppError::NotFound(format!("Server {} not found", server_id)))?;
@@ -99,7 +113,10 @@ pub async fn unfollow_thread(
     thread_id: String,
 ) -> Result<(), AppError> {
     let (client, user_id) = {
-        let servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let servers = state
+            .servers
+            .lock()
+            .map_err(|e| AppError::Config(e.to_string()))?;
         let server = servers
             .get(&server_id)
             .ok_or_else(|| AppError::NotFound(format!("Server {} not found", server_id)))?;
@@ -123,7 +140,10 @@ pub async fn mark_thread_as_read(
     timestamp: i64,
 ) -> Result<(), AppError> {
     let (client, user_id) = {
-        let servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let servers = state
+            .servers
+            .lock()
+            .map_err(|e| AppError::Config(e.to_string()))?;
         let server = servers
             .get(&server_id)
             .ok_or_else(|| AppError::NotFound(format!("Server {} not found", server_id)))?;
@@ -135,5 +155,7 @@ pub async fn mark_thread_as_read(
         (server.client.clone(), user_id)
     };
 
-    client.mark_thread_as_read(&user_id, &team_id, &thread_id, timestamp).await
+    client
+        .mark_thread_as_read(&user_id, &team_id, &thread_id, timestamp)
+        .await
 }

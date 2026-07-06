@@ -13,7 +13,10 @@ pub async fn search_users(
     term: String,
 ) -> Result<Vec<User>, AppError> {
     let client = {
-        let servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let servers = state
+            .servers
+            .lock()
+            .map_err(|e| AppError::Config(e.to_string()))?;
         let server = servers
             .get(&server_id)
             .ok_or_else(|| AppError::NotFound(format!("Server {} not found", server_id)))?;
@@ -30,7 +33,10 @@ pub async fn autocomplete_users(
     term: String,
 ) -> Result<Vec<User>, AppError> {
     let client = {
-        let servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let servers = state
+            .servers
+            .lock()
+            .map_err(|e| AppError::Config(e.to_string()))?;
         let server = servers
             .get(&server_id)
             .ok_or_else(|| AppError::NotFound(format!("Server {} not found", server_id)))?;
@@ -54,7 +60,10 @@ pub async fn autocomplete_users_in_channel(
     term: String,
 ) -> Result<MentionAutocompleteResult, AppError> {
     let client = {
-        let servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let servers = state
+            .servers
+            .lock()
+            .map_err(|e| AppError::Config(e.to_string()))?;
         let server = servers
             .get(&server_id)
             .ok_or_else(|| AppError::NotFound(format!("Server {} not found", server_id)))?;
@@ -63,7 +72,10 @@ pub async fn autocomplete_users_in_channel(
     let (in_channel, out_of_channel) = client
         .autocomplete_users_in_channel(&team_id, &channel_id, &term)
         .await?;
-    Ok(MentionAutocompleteResult { in_channel, out_of_channel })
+    Ok(MentionAutocompleteResult {
+        in_channel,
+        out_of_channel,
+    })
 }
 
 #[derive(Debug, Clone, Serialize, serde::Deserialize)]
@@ -92,7 +104,11 @@ impl ChannelWithMeta {
             ch.total_msg_count
         };
         let msg_count = member.map_or(0, |m| {
-            if m.msg_count_root > 0 { m.msg_count_root } else { m.msg_count }
+            if m.msg_count_root > 0 {
+                m.msg_count_root
+            } else {
+                m.msg_count
+            }
         });
 
         // Patch channel's total_msg_count to use the root value we've chosen
@@ -116,7 +132,10 @@ pub async fn get_channels_for_team(
     team_id: String,
 ) -> Result<Vec<ChannelWithMeta>, AppError> {
     let (client, user_id) = {
-        let servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let servers = state
+            .servers
+            .lock()
+            .map_err(|e| AppError::Config(e.to_string()))?;
         let server = servers
             .get(&server_id)
             .ok_or_else(|| AppError::NotFound(format!("Server {} not found", server_id)))?;
@@ -159,7 +178,10 @@ pub async fn get_channel(
     channel_id: String,
 ) -> Result<Channel, AppError> {
     let client = {
-        let servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let servers = state
+            .servers
+            .lock()
+            .map_err(|e| AppError::Config(e.to_string()))?;
         let server = servers
             .get(&server_id)
             .ok_or_else(|| AppError::NotFound(format!("Server {} not found", server_id)))?;
@@ -176,7 +198,10 @@ pub async fn get_channel_last_viewed_at(
     channel_id: String,
 ) -> Result<i64, AppError> {
     let (client, user_id) = {
-        let servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let servers = state
+            .servers
+            .lock()
+            .map_err(|e| AppError::Config(e.to_string()))?;
         let server = servers
             .get(&server_id)
             .ok_or_else(|| AppError::NotFound(format!("Server {} not found", server_id)))?;
@@ -188,7 +213,9 @@ pub async fn get_channel_last_viewed_at(
         (server.client.clone(), user_id)
     };
 
-    client.get_channel_member_last_viewed(&channel_id, &user_id).await
+    client
+        .get_channel_member_last_viewed(&channel_id, &user_id)
+        .await
 }
 
 #[tauri::command]
@@ -198,7 +225,10 @@ pub async fn view_channel(
     channel_id: String,
 ) -> Result<(), AppError> {
     let (client, user_id) = {
-        let servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let servers = state
+            .servers
+            .lock()
+            .map_err(|e| AppError::Config(e.to_string()))?;
         let server = servers
             .get(&server_id)
             .ok_or_else(|| AppError::NotFound(format!("Server {} not found", server_id)))?;
@@ -220,7 +250,10 @@ pub async fn get_channel_member(
     channel_id: String,
 ) -> Result<ChannelMember, AppError> {
     let (client, user_id) = {
-        let servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let servers = state
+            .servers
+            .lock()
+            .map_err(|e| AppError::Config(e.to_string()))?;
         let server = servers
             .get(&server_id)
             .ok_or_else(|| AppError::NotFound(format!("Server {} not found", server_id)))?;
@@ -242,7 +275,10 @@ pub async fn get_users_by_ids(
     user_ids: Vec<String>,
 ) -> Result<Vec<User>, AppError> {
     let client = {
-        let servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let servers = state
+            .servers
+            .lock()
+            .map_err(|e| AppError::Config(e.to_string()))?;
         let server = servers
             .get(&server_id)
             .ok_or_else(|| AppError::NotFound(format!("Server {} not found", server_id)))?;
@@ -259,7 +295,10 @@ pub async fn get_channel_members_list(
     channel_id: String,
 ) -> Result<serde_json::Value, AppError> {
     let client = {
-        let servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let servers = state
+            .servers
+            .lock()
+            .map_err(|e| AppError::Config(e.to_string()))?;
         let server = servers
             .get(&server_id)
             .ok_or_else(|| AppError::NotFound(format!("Server {} not found", server_id)))?;
@@ -276,7 +315,10 @@ pub async fn get_channel_files(
     channel_id: String,
 ) -> Result<serde_json::Value, AppError> {
     let client = {
-        let servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let servers = state
+            .servers
+            .lock()
+            .map_err(|e| AppError::Config(e.to_string()))?;
         let server = servers
             .get(&server_id)
             .ok_or_else(|| AppError::NotFound(format!("Server {} not found", server_id)))?;
