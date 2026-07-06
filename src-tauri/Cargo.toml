@@ -1,6 +1,6 @@
 [package]
 name = "mattermost-desktop"
-version = "0.2.0"
+version = "0.4.0"
 description = "Cross-platform Mattermost desktop client"
 authors = [""]
 license = "MIT"
@@ -33,6 +33,7 @@ futures-util = "0.3"
 tauri-plugin-notification = "2"
 tauri-plugin-dialog = "2"
 base64 = "0.22"
+keyring = { version = "3", features = ["apple-native", "windows-native", "sync-secret-service"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.6"

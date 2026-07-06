@@ -3,8 +3,8 @@ use tauri::{Emitter, Manager, State};
 
 use crate::errors::AppError;
 use crate::mattermost::client::MattermostClient;
-use crate::state::AppState;
 use crate::state::server_state::ServerState;
+use crate::state::AppState;
 use crate::storage::config::{AppConfig, ServerConfig};
 
 #[derive(Debug, Clone, Serialize)]
@@ -40,7 +40,10 @@ pub async fn add_server(
     };
 
     {
-        let mut servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let mut servers = state
+            .servers
+            .lock()
+            .map_err(|e| AppError::Config(e.to_string()))?;
         servers.insert(id.clone(), server_state);
     }
 
@@ -64,7 +67,10 @@ pub async fn remove_server(
 ) -> Result<(), AppError> {
     // Disconnect WS and attempt logout to invalidate the session token
     let client_opt = {
-        let mut servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let mut servers = state
+            .servers
+            .lock()
+            .map_err(|e| AppError::Config(e.to_string()))?;
         if let Some(server) = servers.get_mut(&server_id) {
             if let Some(ws) = server.ws_manager.take() {
                 ws.disconnect();
@@ -80,12 +86,18 @@ pub async fn remove_server(
     }
 
     {
-        let mut servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let mut servers = state
+            .servers
+            .lock()
+            .map_err(|e| AppError::Config(e.to_string()))?;
         servers.remove(&server_id);
     }
 
     {
-        let mut active = state.active_server_id.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let mut active = state
+            .active_server_id
+            .lock()
+            .map_err(|e| AppError::Config(e.to_string()))?;
         if active.as_deref() == Some(&server_id) {
             *active = None;
         }
@@ -97,10 +109,11 @@ pub async fn remove_server(
 }
 
 #[tauri::command]
-pub async fn list_servers(
-    state: State<'_, AppState>,
-) -> Result<Vec<ServerInfo>, AppError> {
-    let servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+pub async fn list_servers(state: State<'_, AppState>) -> Result<Vec<ServerInfo>, AppError> {
+    let servers = state
+        .servers
+        .lock()
+        .map_err(|e| AppError::Config(e.to_string()))?;
 
     let list = servers
         .iter()
@@ -122,13 +135,22 @@ pub async fn set_active_server(
     app_handle: tauri::AppHandle,
     server_id: String,
 ) -> Result<(), AppError> {
-    let servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+    let servers = state
+        .servers
+        .lock()
+        .map_err(|e| AppError::Config(e.to_string()))?;
     if !servers.contains_key(&server_id) {
-        return Err(AppError::NotFound(format!("Server {} not found", server_id)));
+        return Err(AppError::NotFound(format!(
+            "Server {} not found",
+            server_id
+        )));
     }
     drop(servers);
 
-    let mut active = state.active_server_id.lock().map_err(|e| AppError::Config(e.to_string()))?;
+    let mut active = state
+        .active_server_id
+        .lock()
+        .map_err(|e| AppError::Config(e.to_string()))?;
     *active = Some(server_id.clone());
     drop(active);
 
@@ -137,10 +159,11 @@ pub async fn set_active_server(
 }
 
 #[tauri::command]
-pub async fn get_active_server(
-    state: State<'_, AppState>,
-) -> Result<Option<String>, AppError> {
-    let active = state.active_server_id.lock().map_err(|e| AppError::Config(e.to_string()))?;
+pub async fn get_active_server(state: State<'_, AppState>) -> Result<Option<String>, AppError> {
+    let active = state
+        .active_server_id
+        .lock()
+        .map_err(|e| AppError::Config(e.to_string()))?;
     Ok(active.clone())
 }
 
@@ -193,6 +216,7 @@ fn save_server_config(
 fn remove_server_config(app_handle: &tauri::AppHandle, id: &str) -> Result<(), AppError> {
     let mut config = load_config(app_handle)?;
     config.servers.retain(|s| s.id != id);
+    crate::storage::keychain::delete_token(id);
     save_config(app_handle, &config)
 }
 
@@ -203,7 +227,21 @@ pub fn update_server_token(
 ) -> Result<(), AppError> {
     let mut config = load_config(app_handle)?;
     if let Some(server) = config.servers.iter_mut().find(|s| s.id == id) {
-        server.token = token;
+        // Prefer the OS keychain; keep the token in servers.json only as a
+        // fallback when no keychain is available on this system
+        server.token = match token {
+            Some(t) => {
+                if crate::storage::keychain::set_token(id, &t) {
+                    None
+                } else {
+                    Some(t)
+                }
+            }
+            None => {
+                crate::storage::keychain::delete_token(id);
+                None
+            }
+        };
     }
     save_config(app_handle, &config)
 }
@@ -224,7 +262,10 @@ pub async fn get_server_version(
     server_id: String,
 ) -> Result<String, AppError> {
     let client = {
-        let servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let servers = state
+            .servers
+            .lock()
+            .map_err(|e| AppError::Config(e.to_string()))?;
         let server = servers
             .get(&server_id)
             .ok_or_else(|| AppError::NotFound(format!("Server {} not found", server_id)))?;
@@ -240,16 +281,20 @@ pub async fn open_url(url: String) -> Result<(), AppError> {
     #[cfg(target_os = "macos")]
     std::process::Command::new("open").arg(&url).spawn().ok();
     #[cfg(target_os = "windows")]
-    std::process::Command::new("cmd").args(["/c", "start", &url]).spawn().ok();
+    std::process::Command::new("cmd")
+        .args(["/c", "start", &url])
+        .spawn()
+        .ok();
     #[cfg(target_os = "linux")]
-    std::process::Command::new("xdg-open").arg(&url).spawn().ok();
+    std::process::Command::new("xdg-open")
+        .arg(&url)
+        .spawn()
+        .ok();
     Ok(())
 }
 
 #[tauri::command]
-pub async fn clear_app_cache(
-    app_handle: tauri::AppHandle,
-) -> Result<(), AppError> {
+pub async fn clear_app_cache(app_handle: tauri::AppHandle) -> Result<(), AppError> {
     // Clear any temp files created by save_temp_file
     let tmp_dir = std::env::temp_dir();
     if let Ok(entries) = std::fs::read_dir(&tmp_dir) {
@@ -270,14 +315,33 @@ pub async fn clear_app_cache(
 
 /// Load saved servers into AppState on startup
 pub fn restore_servers(app_handle: &tauri::AppHandle, state: &AppState) -> Result<(), AppError> {
-    let config = load_config(app_handle)?;
+    let mut config = load_config(app_handle)?;
 
-    let mut servers = state.servers.lock().map_err(|e| AppError::Config(e.to_string()))?;
+    // Migrate plaintext tokens from servers.json into the OS keychain
+    let mut migrated = false;
+    for server_config in &mut config.servers {
+        if let Some(token) = &server_config.token {
+            if crate::storage::keychain::set_token(&server_config.id, token) {
+                server_config.token = None;
+                migrated = true;
+            }
+        }
+    }
+    if migrated {
+        save_config(app_handle, &config)?;
+    }
+
+    let mut servers = state
+        .servers
+        .lock()
+        .map_err(|e| AppError::Config(e.to_string()))?;
 
     for server_config in &config.servers {
         let mut client = MattermostClient::new(&server_config.url)?;
-        if let Some(token) = &server_config.token {
-            client.set_token(token.clone());
+        let token = crate::storage::keychain::get_token(&server_config.id)
+            .or_else(|| server_config.token.clone());
+        if let Some(token) = token {
+            client.set_token(token);
         }
 
         servers.insert(
@@ -292,7 +356,10 @@ pub fn restore_servers(app_handle: &tauri::AppHandle, state: &AppState) -> Resul
     }
 
     if let Some(active_id) = &config.active_server_id {
-        let mut active = state.active_server_id.lock().map_err(|e| AppError::Config(e.to_string()))?;
+        let mut active = state
+            .active_server_id
+            .lock()
+            .map_err(|e| AppError::Config(e.to_string()))?;
         *active = Some(active_id.clone());
     }
 
