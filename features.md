@@ -83,6 +83,14 @@ Implemented in one pass:
 - Performance: React.memo on MessageItem, lazy-loaded modals, useMemo/useCallback
 - Accessibility: focus-visible, aria-labels, semantic nav elements
 
+### Security & Tooling Hardening (2026-07-07)
+Аудит репозитория и закрытие найденных проблем одной серией:
+- **XSS**: вывод `marked` шёл в `dangerouslySetInnerHTML` без санитизации (raw HTML из сообщений исполнялся в webview с доступом к Tauri IPC). Добавлен DOMPurify + строгий CSP в tauri.conf.json (`script-src 'self'`, img `data:`/`blob:`, inline-стили только для mermaid). 15 регрессионных тестов.
+- **Токены**: перенесены из plaintext `servers.json` в OS keychain (crate `keyring`: macOS Keychain / Windows Credential Manager / Linux Secret Service) с автоматической миграцией при старте и фолбэком на конфиг.
+- **CI**: шаг фронтенд-тестов заканчивался `|| true` — падения никогда не валили сборку; убрано, добавлен шаг ESLint. Rust-гейты (fmt/clippy `-D warnings`) были красными — применён `cargo fmt` ко всему бэкенду, закрыты 24 clippy-предупреждения.
+- **Линт**: скрипты `lint`/`format` ссылались на несуществующие ESLint/Prettier — добавлены flat config + зависимости. Найдено реальное нарушение Rules of Hooks (два `useMemo` после раннего `return` в ThreadPanel).
+- **Прочее**: препроцессинг `@mention`/`~channel`/`:emoji:` больше не портит код-блоки; версия Cargo.toml синхронизирована (0.2.0 → 0.4.0) и bump-скрипт теперь бампит её тоже; удалён случайно закоммиченный `localhost-recording.json` (490 КБ); заполнен пустой LICENSE; удалён неиспользуемый `react-router-dom`.
+
 ---
 
 ## Bugs & Fixes
@@ -234,6 +242,14 @@ Implemented in one pass:
 | 115 | Синхронизация unread между клиентами: обработка WS события multiple_channels_viewed (официальный клиент → наш клиент); view_channel API (наш → официальный); clearChannelUnread ставит msg_count = total_msg_count; get_channel_member для получения авторитетных счётчиков после внешнего viewed | Готово | 2 |
 | 116 | Исправлен @ mention, ~channel, :emoji: autocomplete в тредах: ThreadPanel заменил встроенный упрощённый composer на shared MessageComposer с rootId prop; убран overflow: hidden с .thread-panel (клипал выпадающие списки, открывающиеся вверх) | Готово | 1 |
 | 117 | Иконка кнопки "Add reaction" заменена с + на ☺; повторный клик закрывает пикер; пикер позиционируется через position:fixed с вычислением координат от viewport — открывается ниже кнопки если влезает, иначе выше; clamp по всем 4 краям экрана; тесты позиционирования (12 кейсов) в src/test/emojiPickerPosition.test.tsx | Готово | 6 |
+| 118 | Защита от XSS: HTML после marked проходит через DOMPurify перед dangerouslySetInnerHTML (raw HTML в сообщениях больше не исполняется); легитимная разметка (упоминания, ссылки с target=_blank, code-блоки) сохраняется; 15 регрессионных тестов в src/test/markdownRenderer.test.tsx | Готово | 2 (дополнительное экранирование codespan дало двойное — marked уже экранирует на уровне токенизатора) |
+| 119 | Строгий CSP в tauri.conf.json вместо csp:null: script-src 'self', картинки data:/blob: (аватарки приходят data-URL через Rust), unsafe-inline только для стилей (mermaid SVG), frame/object запрещены | Готово | 1 |
+| 120 | Токены серверов хранятся в OS keychain (keyring: macOS Keychain / Windows Credential Manager / Linux Secret Service) вместо plaintext servers.json; существующие токены мигрируют автоматически при старте; фолбэк на конфиг если keychain недоступен; libdbus-1-dev добавлен в CI для Linux | Готово | 1 |
+| 121 | @mention, ~channel и :emoji: не заменяются внутри код-блоков и inline-кода: препроцессинг применяется только к сегментам вне ``` ``` и `` ` `` (split по регулярке код-сегментов); +4 теста | Готово | 1 |
+| 122 | ESLint (flat config: typescript-eslint + react-hooks) и Prettier установлены и настроены — скрипты lint/format раньше ссылались на отсутствующие пакеты; найдено и исправлено нарушение Rules of Hooks: два useMemo в ThreadPanel стояли после раннего return null; новые compiler-правила (set-state-in-effect, refs) понижены до warn (42 шт., техдолг) | Готово | 1 |
+| 123 | CI ужесточён: убран `\|\| true` после фронтенд-тестов (падения не валили сборку), добавлен шаг ESLint; Rust-гейты доведены до зелёного: cargo fmt по всему бэкенду, 24 clippy-предупреждения закрыты (dead API-код помечен allow(dead_code), result_large_err разрешён на уровне crate) | Готово | 1 |
+| 124 | Версия синхронизирована во всех манифестах (Cargo.toml отставал: 0.2.0 при 0.4.0 в package.json/tauri.conf.json); scripts/bump-version.js теперь бампит также Cargo.toml и Cargo.lock | Готово | 1 |
+| 125 | Чистка репозитория: удалён случайно закоммиченный localhost-recording.json (490 КБ, WebKit timeline recording; паттерн добавлен в .gitignore), пустой LICENSE заполнен текстом MIT, удалён неиспользуемый react-router-dom, добавлен dompurify | Готово | 1 |
 
 ---
 
