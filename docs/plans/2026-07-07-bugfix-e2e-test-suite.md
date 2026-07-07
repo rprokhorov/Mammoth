@@ -48,12 +48,12 @@ Two-part effort. First, a focused bug-hunting pass over the frontend stores/hook
 - Create: `src/test/useWebSocket.test.ts`
 - Modify: `src/hooks/useWebSocket.ts` (only if a handler bug is confirmed)
 
-- [ ] Test `handlePosted`: top-level post adds to channel order; thread reply increments root `reply_count` and routes to open thread vs. followed-thread unread; system messages skip unread/notify
-- [ ] Test `isMentioned` / `shouldNotify` matrix: muted channel, `desktop: none/mention/all/default`, `@username`, `@channel/@all/@here`, no current user
-- [ ] Test reactions (`handleReactionAdded`/`Removed`): dedup, only-notify-on-my-post, reaction chip updates on post + thread copy
-- [ ] Test `handleChannelViewed` / `handleMultipleChannelsViewed`, `handleTyping` (5s timeout via fake timers), `handleDraftUpserted`/`Deleted` newer-wins, `handleOpenDialog` nested-unwrap
-- [ ] Fix any confirmed handler bug found while testing
-- [ ] run `npm run test` — must pass before Task 3
+- [x] Test `handlePosted`: top-level post adds to channel order; thread reply increments root `reply_count` and routes to open thread vs. followed-thread unread; system messages skip unread/notify — covered in `src/test/useWebSocket.test.ts` (top-level order/badge/tab, thread-reply routing + followed vs unfollowed unread, system-message skip of unread/tab/notify)
+- [x] Test `isMentioned` / `shouldNotify` matrix: muted channel, `desktop: none/mention/all/default`, `@username`, `@channel/@all/@here`, no current user — full matrix exercised via the desktop-notification `show_notification` invoke (default/all notify all; none & muted suppress; mention gates on `@username`/`@channel`/`@all`/`@here`; no-current-user suppressed; empty-username @me not a mention)
+- [x] Test reactions (`handleReactionAdded`/`Removed`): dedup, only-notify-on-my-post, reaction chip updates on post + thread copy — chip add/remove on post and thread copy, dedup of identical user+emoji, notify only when someone else reacts to MY post, unknown-post no-op
+- [x] Test `handleChannelViewed` / `handleMultipleChannelsViewed`, `handleTyping` (5s timeout via fake timers), `handleDraftUpserted`/`Deleted` newer-wins, `handleOpenDialog` nested-unwrap — plus `channel_member_updated` notify-props sync and `post_edited`/`post_deleted`; typing uses fake timers for the 5s expiry + timer reset
+- [x] Fix any confirmed handler bug found while testing — none found; all handlers behave correctly, so `useWebSocket.ts` is unchanged (tests are characterization coverage)
+- [x] run `npm run test` — must pass before Task 3 — 151 tests pass (8 files); new `useWebSocket.test.ts` adds 55
 
 ### Task 3: Remaining store coverage (drafts, reactions, tabs, ui, threads)
 
