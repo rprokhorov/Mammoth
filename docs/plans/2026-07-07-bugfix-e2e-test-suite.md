@@ -36,11 +36,11 @@ Two-part effort. First, a focused bug-hunting pass over the frontend stores/hook
 - Modify (fixes as confirmed): `src/stores/threadsStore.ts`, `src/App.tsx`, and any store where a bug is confirmed
 - Create: `src/test/bugfixes.test.ts` (regression tests, one `describe` per confirmed bug)
 
-- [ ] Audit `threadsStore.markThreadRead` / `incrementThreadUnread` for over/under-decrement of `userThreadsUnread`; write a failing test reproducing the drift, then fix
-- [ ] Audit `App.tsx` cold-start notification path (`notif:navigate-channel`, `check_pending_notification`) for selecting a channel before `channels` are loaded; add a guard/retry and a regression test
-- [ ] Audit `tabsStore.incrementTabUnread` and `uiStore.incrementChannelUnread`/`clearChannelUnread` for off-by-one / active-channel edge cases; add tests, fix if confirmed
-- [ ] For any suspected issue that turns out correct, add a characterization test instead and note it in the test file
-- [ ] run `npm run test` — must pass before Task 2
+- [x] Audit `threadsStore.markThreadRead` / `incrementThreadUnread` for over/under-decrement of `userThreadsUnread`; write a failing test reproducing the drift, then fix — CONFIRMED BUG: the `hasOrphanedCount` heuristic (`userThreadsUnread > knownUnreadCount`) decremented the global counter when marking ANY not-in-list, never-unread thread read, whenever the server's unread total exceeded the count of unread threads on the loaded page. Fixed by tracking orphaned unread thread ids explicitly (`orphanedUnreadThreadIds`) so only threads that actually contributed to the counter decrement it; `setUserThreads` resets the set (server is authoritative), `incrementThreadUnread` records/dedups orphans. Regression tests in `bugfixes.test.ts`
+- [x] Audit `App.tsx` cold-start notification path (`notif:navigate-channel`, `check_pending_notification`) for selecting a channel before `channels` are loaded; add a guard/retry and a regression test — CONFIRMED BUG: `handleSelectChannel` set a stale `activeChannelId` for a not-yet-loaded channel, skipping last-viewed priming and suppressing the `channels-loaded` auto-select fallback. Fixed with `src/stores/pendingChannelSelection.ts` guard: not-yet-loaded selections are deferred and re-applied by the `channels-loaded` handler. Regression tests in `bugfixes.test.ts`
+- [x] Audit `tabsStore.incrementTabUnread` and `uiStore.incrementChannelUnread`/`clearChannelUnread` for off-by-one / active-channel edge cases; add tests, fix if confirmed — audited, behavior CORRECT (no code change); characterization tests added
+- [x] For any suspected issue that turns out correct, add a characterization test instead and note it in the test file — `tabsStore.incrementTabUnread` and `uiStore` channel unread math locked in with characterization tests marked "no bug"
+- [x] run `npm run test` — must pass before Task 2 — 96 tests pass (7 files)
 
 ### Task 2: `useWebSocket` event-handler tests (largest untested surface)
 
