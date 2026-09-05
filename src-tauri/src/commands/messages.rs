@@ -63,6 +63,7 @@ pub async fn get_posts(
     channel_id: String,
     page: u32,
     per_page: u32,
+    before: Option<String>,
 ) -> Result<PostsResponse, AppError> {
     let client = {
         let servers = state
@@ -76,7 +77,7 @@ pub async fn get_posts(
     };
 
     let post_list = client
-        .get_posts_for_channel(&channel_id, page, per_page)
+        .get_posts_for_channel(&channel_id, page, per_page, before.as_deref())
         .await?;
 
     Ok(PostsResponse {

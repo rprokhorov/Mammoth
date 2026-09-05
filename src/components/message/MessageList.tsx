@@ -2,7 +2,7 @@ import { useEffect, useRef, useCallback, useState, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useMessagesStore, type PostData } from "@/stores/messagesStore";
 import { useUiStore } from "@/stores/uiStore";
-import { useThreadsStore } from "@/stores/threadsStore";
+import { fetchThreadParticipants } from "@/utils/threadParticipants";
 import {
   primeLastViewedSnapshot,
   getLastViewedSnapshot,
@@ -38,37 +38,6 @@ const POSTS_PER_PAGE = 30;
 const GROUP_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
 const EMPTY_ORDER: string[] = [];
 
-function fetchThreadParticipants(rawRootIds: string[], serverId: string) {
-  // Defer to let store settle after setChannelPosts/prependOlderPosts
-  setTimeout(() => {
-    const { threadParticipants } = useThreadsStore.getState();
-    const allPosts = useMessagesStore.getState().posts;
-    // Also include any posts in store with reply_count computed from replies
-    const ids = new Set(rawRootIds);
-    for (const p of Object.values(allPosts)) {
-      if (!p.root_id && (p.reply_count ?? 0) > 0) ids.add(p.id);
-    }
-    for (const rootId of ids) {
-      if (threadParticipants[rootId]) continue;
-      invoke<PostsResponse>("get_post_thread", { serverId, postId: rootId })
-        .then((threadRes) => {
-          const seen = new Set<string>();
-          const result: string[] = [];
-          const sorted = Object.values(threadRes.posts).sort((a, b) => a.create_at - b.create_at);
-          for (const p of sorted) {
-            if (!seen.has(p.user_id)) {
-              seen.add(p.user_id);
-              result.push(p.user_id);
-              if (result.length === 3) break;
-            }
-          }
-          useThreadsStore.getState().setThreadParticipants(rootId, result);
-        })
-        .catch(() => {});
-    }
-  }, 0);
-}
-
 function getMessagesActions() {
   const s = useMessagesStore.getState();
   return {
@@ -83,7 +52,7 @@ function getMessagesActions() {
 function prefetchUsers(userIds: string[], serverId: string) {
   if (userIds.length === 0) return;
   const users = useUiStore.getState().users;
-  const unknown = userIds.filter((id) => !users[id]);
+  const unknown = [...new Set(userIds)].filter((id) => !users[id]);
   if (unknown.length === 0) return;
   invoke("get_users_by_ids", { serverId, userIds: unknown })
     .then((result) => {
@@ -113,6 +82,10 @@ export function MessageList({
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [isNearBottom, setIsNearBottom] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadAttempt, setLoadAttempt] = useState(0);
+  const loadGeneration = useRef(0);
+  const olderRequest = useRef<object | null>(null);
+  const initialLoading = useRef(false);
   const shouldPinToBottom = useRef(false);
   const userScrolled = useRef(false);
   const [unreadInfo, setUnreadInfo] = useState<{ firstUnreadId: string; count: number } | null>(null);
@@ -128,12 +101,16 @@ export function MessageList({
   // 3. If no disk cache → show spinner, fetch, then display
   useEffect(() => {
     let cancelled = false;
+    loadGeneration.current++;
+    olderRequest.current = null;
+    initialLoading.current = true;
+    setLoadingOlder(false);
     const { setLoading, setChannelPosts } = getMessagesActions();
 
     const hasCachedInMemory = (useMessagesStore.getState().orderByChannel[channelId]?.length ?? 0) > 0;
 
     // Show spinner only if truly no data available
-    if (!hasCachedInMemory) setLoading(true);
+    setLoading(!hasCachedInMemory);
 
     setHasMore(true);
     setLoadError(null);
@@ -173,9 +150,8 @@ export function MessageList({
     };
 
     const applyPosts = (res: UnreadPostsResponse, scrollToBottom: boolean) => {
-      if (!res) return;
+      if (!res || cancelled) return;
       setChannelPosts(channelId, res.order, res.posts);
-      if (cancelled) return;
 
       if (res.prev_post_id === "") setHasMore(false);
 
@@ -205,10 +181,7 @@ export function MessageList({
       );
 
       // Background: load thread participants
-      fetchThreadParticipants(
-        Object.values(res.posts).filter((p) => !p.root_id && (p.reply_count ?? 0) > 0).map((p) => p.id),
-        serverId,
-      );
+      void fetchThreadParticipants(channelId, serverId);
 
       if (scrollToBottom) {
         requestAnimationFrame(() => {
@@ -251,6 +224,7 @@ export function MessageList({
       }
 
       // Step 2: always fetch from network (silently if we already have data)
+      if (cancelled) return;
       const withRetry = () =>
         fetchFromNetwork().catch((e) => {
           if (cancelled) return Promise.reject(e);
@@ -300,7 +274,10 @@ export function MessageList({
           }
         }
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          initialLoading.current = false;
+          setLoading(false);
+        }
       }
     };
 
@@ -308,8 +285,9 @@ export function MessageList({
 
     return () => {
       cancelled = true;
+      loadGeneration.current++;
     };
-  }, [channelId, serverId]);
+  }, [channelId, serverId, loadAttempt]);
 
   // Auto-scroll when new messages arrive and we're near bottom
   useEffect(() => {
@@ -375,42 +353,50 @@ export function MessageList({
   }, [hasMore, loadingOlder, channelId, serverId, order]);
 
   async function loadOlderPosts() {
-    if (!hasMore || loadingOlder) return;
+    if (!hasMore || olderRequest.current || initialLoading.current) return;
+    const currentOrder = useMessagesStore.getState().orderByChannel[channelId] ?? EMPTY_ORDER;
+    const before = currentOrder[currentOrder.length - 1];
+    if (!before) return;
+    const generation = loadGeneration.current;
+    const request = {};
+    olderRequest.current = request;
     setLoadingOlder(true);
 
-    const page = Math.ceil(order.length / POSTS_PER_PAGE);
     const el = scrollRef.current;
     const prevScrollHeight = el?.scrollHeight ?? 0;
+    const prevScrollTop = el?.scrollTop ?? 0;
 
     try {
       const res = await invoke<PostsResponse>("get_posts", {
         serverId,
         channelId,
-        page,
+        page: 0,
         perPage: POSTS_PER_PAGE,
+        before,
       });
 
+      if (generation !== loadGeneration.current) return;
       getMessagesActions().prependOlderPosts(channelId, res.order, res.posts);
       if (res.order.length < POSTS_PER_PAGE) setHasMore(false);
 
       // C: prefetch users for older posts
       prefetchUsers(Object.values(res.posts).map((p) => p.user_id), serverId);
 
-      fetchThreadParticipants(
-        Object.values(res.posts).filter((p) => !p.root_id && (p.reply_count ?? 0) > 0).map((p) => p.id),
-        serverId,
-      );
+      void fetchThreadParticipants(channelId, serverId);
 
       // Maintain scroll position after prepending
       requestAnimationFrame(() => {
-        if (el) {
-          el.scrollTop = el.scrollHeight - prevScrollHeight;
+        if (el && generation === loadGeneration.current) {
+          el.scrollTop = prevScrollTop + el.scrollHeight - prevScrollHeight;
         }
       });
     } catch (e) {
       console.error("Failed to load older posts:", e);
     } finally {
-      setLoadingOlder(false);
+      if (olderRequest.current === request) {
+        olderRequest.current = null;
+        setLoadingOlder(false);
+      }
     }
   }
 
@@ -555,13 +541,7 @@ for (const postId of displayOrder) {
         <button
           className="btn btn-secondary"
           onClick={() => {
-            setLoadError(null);
-            const { setLoading, setChannelPosts } = getMessagesActions();
-            setLoading(true);
-            invoke<PostsResponse>("get_posts", { serverId, channelId, page: 0, perPage: POSTS_PER_PAGE })
-              .then((res) => { setChannelPosts(channelId, res.order, res.posts); })
-              .catch(() => setLoadError("Не удалось загрузить сообщения"))
-              .finally(() => setLoading(false));
+            setLoadAttempt((attempt) => attempt + 1);
           }}
         >
           Повторить

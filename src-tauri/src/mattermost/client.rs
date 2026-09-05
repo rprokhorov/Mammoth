@@ -370,12 +370,19 @@ impl MattermostClient {
         channel_id: &str,
         page: u32,
         per_page: u32,
+        before: Option<&str>,
     ) -> Result<PostList, AppError> {
+        let query = {
+            let mut query = url::form_urlencoded::Serializer::new(String::new());
+            query.append_pair("page", &page.to_string());
+            query.append_pair("per_page", &per_page.to_string());
+            if let Some(post_id) = before {
+                query.append_pair("before", post_id);
+            }
+            query.finish()
+        };
         let resp = self
-            .get_authenticated(&format!(
-                "/channels/{}/posts?page={}&per_page={}",
-                channel_id, page, per_page
-            ))
+            .get_authenticated(&format!("/channels/{}/posts?{}", channel_id, query))
             .await?;
         let posts: PostList = resp.json().await?;
         Ok(posts)
