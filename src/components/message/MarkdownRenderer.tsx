@@ -1,11 +1,14 @@
 import { marked, Renderer } from "marked";
 import DOMPurify from "dompurify";
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState, useCallback, lazy, Suspense } from "react";
 import { emit } from "@tauri-apps/api/event";
 import { emojiNameToUnicode } from "./EmojiPicker";
-import { MermaidBlock } from "./MermaidBlock";
 import { useUiStore } from "@/stores/uiStore";
 import { UserPopover } from "@/components/user/UserPopover";
+
+const MermaidBlock = lazy(() => import("./MermaidBlock").then((module) => ({
+  default: module.MermaidBlock,
+})));
 
 interface MarkdownRendererProps {
   text: string;
@@ -134,7 +137,7 @@ export function MarkdownRenderer({ text, serverId }: MarkdownRendererProps) {
     const { html, mermaidBlocks } = renderMarkdown(text, users, channelsByName);
 
     if (mermaidBlocks.length === 0) {
-      return { htmlParts: [html], mermaidBlocks: [] };
+      return { htmlParts: [sanitizeHtml(html)], mermaidBlocks: [] };
     }
 
     // Split the HTML by mermaid placeholders
@@ -149,7 +152,7 @@ export function MarkdownRenderer({ text, serverId }: MarkdownRendererProps) {
       }
     }
     parts.push(remaining);
-    return { htmlParts: parts, mermaidBlocks };
+    return { htmlParts: parts.map(sanitizeHtml), mermaidBlocks };
   }, [text, users, channelsByName]);
 
   const handleClick = useCallback((e: React.MouseEvent) => {
@@ -182,12 +185,16 @@ export function MarkdownRenderer({ text, serverId }: MarkdownRendererProps) {
   const body = (
     <>
       {mermaidBlocks.length === 0 ? (
-        <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(htmlParts[0]) }} />
+        <span dangerouslySetInnerHTML={{ __html: htmlParts[0] }} />
       ) : (
         htmlParts.map((html, i) => (
           <span key={i}>
-            {html && <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(html) }} />}
-            {i < mermaidBlocks.length && <MermaidBlock code={mermaidBlocks[i]} />}
+            {html && <span dangerouslySetInnerHTML={{ __html: html }} />}
+            {i < mermaidBlocks.length && (
+              <Suspense fallback={<pre className="code-block"><code>{mermaidBlocks[i]}</code></pre>}>
+                <MermaidBlock code={mermaidBlocks[i]} />
+              </Suspense>
+            )}
           </span>
         ))
       )}
