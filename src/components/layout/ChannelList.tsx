@@ -164,8 +164,20 @@ export function ChannelList({ onSelectChannel, onCreateChannel, serverId, curren
   }
 
   function hasMention(channel: ChannelInfo): boolean {
-    if (isMuted(channel)) return false;
+    if (isMuted(channel)) return unreadBadgeCount(channel) > 0;
     return channel.mention_count > 0;
+  }
+
+  /**
+   * Number shown in the sidebar badge. Normally the @mention count, but a muted
+   * DM counts unread messages instead: a bot writing directly never mentions
+   * anyone, so mention_count stays 0 and the badge would never appear.
+   */
+  function unreadBadgeCount(channel: ChannelInfo): number {
+    if (channel.mention_count > 0) return channel.mention_count;
+    const isDirect = channel.channel_type === "D" || channel.channel_type === "G";
+    if (!isDirect || !isMuted(channel) || !unreadFilterIncludesMutedDms) return 0;
+    return Math.max(0, channel.total_msg_count - channel.msg_count);
   }
 
   function hasUnreadMessages(channel: ChannelInfo): boolean {
@@ -180,9 +192,9 @@ export function ChannelList({ onSelectChannel, onCreateChannel, serverId, curren
 
   /**
    * Membership in the unread filter. Wider than isUnread: a muted DM or group
-   * chat still stays quiet in the list (no bold, no badge) but is reachable
-   * through the filter, because a person writing directly is not the same as
-   * traffic in a muted channel.
+   * chat stays unbolded in the list but is reachable through the filter and
+   * carries an unread badge, because a person writing directly is not the same
+   * as traffic in a muted channel.
    */
   function matchesUnreadFilter(channel: ChannelInfo): boolean {
     if (isUnread(channel)) return true;
@@ -551,7 +563,7 @@ export function ChannelList({ onSelectChannel, onCreateChannel, serverId, curren
         )}
         <span className="channel-name">{getDisplayName(ch)}</span>
         {hasMention(ch) && (
-          <span className="mention-badge">{ch.mention_count}</span>
+          <span className="mention-badge">{unreadBadgeCount(ch)}</span>
         )}
       </button>
     );
@@ -811,6 +823,7 @@ export function ChannelList({ onSelectChannel, onCreateChannel, serverId, curren
                     isUnread={isUnread}
                     isMuted={isMuted}
                     hasMention={hasMention}
+                    unreadBadgeCount={unreadBadgeCount}
                     onSelect={onSelectChannel}
                     onContextMenu={handleContextMenu}
                     onMiddleClick={handleMiddleClick}
@@ -826,6 +839,7 @@ export function ChannelList({ onSelectChannel, onCreateChannel, serverId, curren
                     isUnread={isUnread}
                     isMuted={isMuted}
                     hasMention={hasMention}
+                    unreadBadgeCount={unreadBadgeCount}
                     onSelect={onSelectChannel}
                     onContextMenu={handleContextMenu}
                     onMiddleClick={handleMiddleClick}
@@ -841,6 +855,7 @@ export function ChannelList({ onSelectChannel, onCreateChannel, serverId, curren
                     isUnread={isUnread}
                     isMuted={isMuted}
                     hasMention={hasMention}
+                    unreadBadgeCount={unreadBadgeCount}
                     onSelect={onSelectChannel}
                     onContextMenu={handleContextMenu}
                     onMiddleClick={handleMiddleClick}
@@ -856,6 +871,7 @@ export function ChannelList({ onSelectChannel, onCreateChannel, serverId, curren
                     isUnread={isUnread}
                     isMuted={isMuted}
                     hasMention={hasMention}
+                    unreadBadgeCount={unreadBadgeCount}
                     onSelect={onSelectChannel}
                     onContextMenu={handleContextMenu}
                     onMiddleClick={handleMiddleClick}
@@ -1034,6 +1050,7 @@ interface ChannelGroupProps {
   isUnread: (ch: ChannelInfo) => boolean;
   isMuted: (ch: ChannelInfo) => boolean;
   hasMention: (ch: ChannelInfo) => boolean;
+  unreadBadgeCount: (ch: ChannelInfo) => number;
   onSelect: (id: string) => void;
   onContextMenu: (e: React.MouseEvent, channelId: string) => void;
   onMiddleClick: (channelId: string) => void;
@@ -1048,6 +1065,7 @@ function ChannelGroup({
   isUnread,
   isMuted,
   hasMention,
+  unreadBadgeCount,
   onSelect,
   onContextMenu,
   onMiddleClick,
@@ -1073,7 +1091,7 @@ function ChannelGroup({
           <span className="channel-prefix">{getPrefix(ch)}</span>
           <span className="channel-name">{getDisplayName(ch)}</span>
           {hasMention(ch) && (
-            <span className="mention-badge">{ch.mention_count}</span>
+            <span className="mention-badge">{unreadBadgeCount(ch)}</span>
           )}
         </button>
       ))}

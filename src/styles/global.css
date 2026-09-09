@@ -3437,11 +3437,14 @@ pre.code-block.mermaid-code {
   justify-content: space-between;
   align-items: center;
   padding: 8px 0;
+  gap: 16px;
 }
 .settings-label {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  /* Let a long description wrap instead of pushing the control out of line. */
+  min-width: 0;
 }
 .settings-label span:first-child {
   font-size: 14px;
@@ -3625,6 +3628,8 @@ pre.code-block.mermaid-code {
   width: 40px;
   height: 22px;
   cursor: pointer;
+  /* Fixed 40px track: never let a long label squeeze the switch. */
+  flex-shrink: 0;
 }
 .settings-toggle input {
   opacity: 0;

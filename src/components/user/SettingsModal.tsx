@@ -167,8 +167,7 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
               <div className="settings-label">
                 <span>Show muted DMs in unread filter</span>
                 <span className="settings-desc">
-                  Muted direct messages and group chats stay quiet in the sidebar
-                  but still appear under Filter by unread (⌘U)
+                  Muted DMs stay quiet but appear under Filter by unread
                 </span>
               </div>
               <label className="settings-toggle">

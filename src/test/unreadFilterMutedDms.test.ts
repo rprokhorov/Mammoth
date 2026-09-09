@@ -25,6 +25,16 @@ function matchesUnreadFilter(c: Chan, includeMutedDms: boolean) {
   return isDirect && isMuted(c) && hasUnreadMessages(c);
 }
 
+function unreadBadgeCount(c: Chan, includeMutedDms: boolean): number {
+  if (c.mention_count > 0) return c.mention_count;
+  const isDirect = c.channel_type === "D" || c.channel_type === "G";
+  if (!isDirect || !isMuted(c) || !includeMutedDms) return 0;
+  return Math.max(0, c.total_msg_count - c.msg_count);
+}
+
+const hasMention = (c: Chan, includeMutedDms: boolean) =>
+  isMuted(c) ? unreadBadgeCount(c, includeMutedDms) > 0 : c.mention_count > 0;
+
 function chan(over: Partial<Chan> = {}): Chan {
   return {
     channel_type: "O", total_msg_count: 10, msg_count: 10,
@@ -87,5 +97,47 @@ describe("the setting itself", () => {
   it("can be turned off", () => {
     useSettingsStore.getState().updateSetting("unreadFilterIncludesMutedDms", false);
     expect(useSettingsStore.getState().unreadFilterIncludesMutedDms).toBe(false);
+  });
+});
+
+describe("unread badge on muted DMs", () => {
+  it("counts unread messages for a muted DM with no mentions", () => {
+    // The reported case: a bot writes directly and never @-mentions anyone.
+    expect(unreadBadgeCount(mutedUnreadDm, true)).toBe(2);
+    expect(hasMention(mutedUnreadDm, true)).toBe(true);
+  });
+
+  it("prefers the mention count when there are mentions", () => {
+    const withMention = { ...mutedUnreadDm, mention_count: 1 };
+    expect(unreadBadgeCount(withMention, true)).toBe(1);
+  });
+
+  it("shows no badge for a muted regular channel", () => {
+    const mutedChannel = { ...mutedUnreadDm, channel_type: "O" };
+    expect(unreadBadgeCount(mutedChannel, true)).toBe(0);
+    expect(hasMention(mutedChannel, true)).toBe(false);
+  });
+
+  it("shows no badge for a muted DM once everything is read", () => {
+    const read = { ...mutedUnreadDm, total_msg_count: 3, msg_count: 3 };
+    expect(unreadBadgeCount(read, true)).toBe(0);
+    expect(hasMention(read, true)).toBe(false);
+  });
+
+  it("shows no badge when the setting is off", () => {
+    expect(unreadBadgeCount(mutedUnreadDm, false)).toBe(0);
+    expect(hasMention(mutedUnreadDm, false)).toBe(false);
+  });
+
+  it("leaves unmuted channels on the mention count", () => {
+    const normal = chan({ total_msg_count: 9, msg_count: 3, mention_count: 0 });
+    // Plenty unread, but no mentions: an unmuted channel shows bold, not a number.
+    expect(unreadBadgeCount(normal, true)).toBe(0);
+    expect(hasMention(normal, true)).toBe(false);
+  });
+
+  it("never renders a negative count", () => {
+    const skewed = { ...mutedUnreadDm, total_msg_count: 2, msg_count: 5 };
+    expect(unreadBadgeCount(skewed, true)).toBe(0);
   });
 });
