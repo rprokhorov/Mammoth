@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use futures_util::{SinkExt, StreamExt};
 use tauri::Emitter;
@@ -7,6 +7,13 @@ use tokio_tungstenite::connect_async;
 use tokio_tungstenite::tungstenite::Message;
 
 use super::events::*;
+
+/// How often to send a client-initiated ping to keep the connection alive.
+const PING_INTERVAL: Duration = Duration::from_secs(30);
+/// If no frame of any kind arrives within this window, the connection is
+/// considered dead (half-open) and we force a reconnect. Must be comfortably
+/// larger than PING_INTERVAL so a single missed pong doesn't trip it.
+const IDLE_TIMEOUT: Duration = Duration::from_secs(75);
 
 /// Manages a WebSocket connection to a single Mattermost server
 pub struct WsManager {
@@ -98,7 +105,16 @@ async fn ws_loop(
                     }
                 }
 
-                // Read loop
+                // Read loop with keep-alive. We proactively ping the server on a
+                // fixed interval and treat prolonged silence as a dead connection.
+                // This is essential behind reverse proxies / NAT, where a stalled
+                // (half-open) TCP connection never surfaces an error on read.next()
+                // and would otherwise silently stop delivering `posted` events.
+                let mut ping_timer = tokio::time::interval(PING_INTERVAL);
+                // First tick fires immediately; skip it so we don't ping right after connecting.
+                ping_timer.tick().await;
+                let mut last_activity = Instant::now();
+
                 loop {
                     tokio::select! {
                         _ = shutdown_rx.changed() => {
@@ -108,13 +124,35 @@ async fn ws_loop(
                                 return;
                             }
                         }
+                        _ = ping_timer.tick() => {
+                            // If we've heard nothing for too long, the connection is
+                            // dead despite no explicit error — drop it and reconnect.
+                            if last_activity.elapsed() >= IDLE_TIMEOUT {
+                                log::warn!(
+                                    "[WS:{}] No activity for {:?}, assuming dead connection",
+                                    server_id,
+                                    last_activity.elapsed()
+                                );
+                                break;
+                            }
+                            if let Err(e) = write.send(Message::Ping(Vec::new().into())).await {
+                                log::error!("[WS:{}] Failed to send ping: {}", server_id, e);
+                                break;
+                            }
+                        }
                         msg = read.next() => {
                             match msg {
                                 Some(Ok(Message::Text(text))) => {
+                                    last_activity = Instant::now();
                                     handle_message(&app_handle, &server_id, &text);
                                 }
                                 Some(Ok(Message::Ping(data))) => {
+                                    last_activity = Instant::now();
                                     let _ = write.send(Message::Pong(data)).await;
+                                }
+                                Some(Ok(Message::Pong(_))) => {
+                                    // Server answered our keep-alive ping.
+                                    last_activity = Instant::now();
                                 }
                                 Some(Ok(Message::Close(_))) => {
                                     log::info!("[WS:{}] Server closed connection", server_id);
@@ -128,7 +166,9 @@ async fn ws_loop(
                                     log::info!("[WS:{}] Stream ended", server_id);
                                     break;
                                 }
-                                _ => {}
+                                _ => {
+                                    last_activity = Instant::now();
+                                }
                             }
                         }
                     }

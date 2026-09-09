@@ -13,6 +13,9 @@ src-tauri/target/
 *.swp
 *.swo
 
+# Local agent permissions and machine-specific settings
+.claude/settings.local*.json
+
 # Environment
 .env
 .env.local

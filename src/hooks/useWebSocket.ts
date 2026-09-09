@@ -44,6 +44,38 @@ let notifPermission: boolean | null = null;
 export function useWebSocket() {
   const activeServerId = useUiStore((s) => s.activeServerId);
 
+  // Force a WebSocket reconnect when the window regains focus / visibility or
+  // the network comes back online. Sleep/wake and network blips tear the socket
+  // down instantly; without this the app would wait out the backend idle-timeout
+  // before noticing, leaving new messages undelivered until the user switches
+  // channels (which triggers a fresh HTTP fetch).
+  useEffect(() => {
+    let lastReconnect = 0;
+    const reconnect = () => {
+      const serverId = useUiStore.getState().activeServerId;
+      if (!serverId) return;
+      // Debounce: focus/visibility can fire in quick succession.
+      const now = Date.now();
+      if (now - lastReconnect < 5000) return;
+      lastReconnect = now;
+      invoke("connect_ws", { serverId }).catch(() => {});
+    };
+
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") reconnect();
+    };
+
+    window.addEventListener("focus", reconnect);
+    window.addEventListener("online", reconnect);
+    document.addEventListener("visibilitychange", onVisibility);
+
+    return () => {
+      window.removeEventListener("focus", reconnect);
+      window.removeEventListener("online", reconnect);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, []);
+
   useEffect(() => {
     const unlistenStatus = listen<WsStatusPayload>("ws_status", (event) => {
       const currentServerId = useUiStore.getState().activeServerId;
