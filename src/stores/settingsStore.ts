@@ -7,6 +7,8 @@ export interface AppSettings {
   sendOnEnter: boolean;
   showTimestamps: boolean;
   notificationsEnabled: boolean;
+  /** Show muted DMs and group chats in the unread filter when they have unread messages. */
+  unreadFilterIncludesMutedDms: boolean;
   developerMode: boolean;
 }
 
@@ -17,6 +19,7 @@ const DEFAULTS: AppSettings = {
   sendOnEnter: true,
   showTimestamps: true,
   notificationsEnabled: true,
+  unreadFilterIncludesMutedDms: true,
   developerMode: false,
 };
 
@@ -35,7 +38,12 @@ function loadSettings(): AppSettings {
 }
 
 function saveSettings(settings: AppSettings) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+  } catch {
+    // Storage can be unavailable or full (private mode, blocked site data).
+    // Losing persistence is acceptable; throwing out of a setter is not.
+  }
 }
 
 interface SettingsState extends AppSettings {
@@ -56,6 +64,7 @@ export const useSettingsStore = create<SettingsState>((set) => ({
         sendOnEnter: next.sendOnEnter,
         showTimestamps: next.showTimestamps,
         notificationsEnabled: next.notificationsEnabled,
+        unreadFilterIncludesMutedDms: next.unreadFilterIncludesMutedDms,
         developerMode: next.developerMode,
       });
       return { [key]: value };

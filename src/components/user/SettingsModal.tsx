@@ -162,6 +162,24 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
                 <span className="toggle-slider" />
               </label>
             </div>
+
+            <div className="settings-row">
+              <div className="settings-label">
+                <span>Show muted DMs in unread filter</span>
+                <span className="settings-desc">
+                  Muted direct messages and group chats stay quiet in the sidebar
+                  but still appear under Filter by unread (⌘U)
+                </span>
+              </div>
+              <label className="settings-toggle">
+                <input
+                  type="checkbox"
+                  checked={settings.unreadFilterIncludesMutedDms}
+                  onChange={() => toggle("unreadFilterIncludesMutedDms")}
+                />
+                <span className="toggle-slider" />
+              </label>
+            </div>
           </div>
 
           {/* Advanced */}

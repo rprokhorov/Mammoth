@@ -7,6 +7,7 @@ import { useThreadsStore } from "@/stores/threadsStore";
 import { useReactionsStore } from "@/stores/reactionsStore";
 import { useDraftsStore } from "@/stores/draftsStore";
 import { useTabsStore } from "@/stores/tabsStore";
+import { useSettingsStore } from "@/stores/settingsStore";
 import { UserAvatar } from "@/components/common/UserAvatar";
 import { QuickSwitcher } from "@/components/search/QuickSwitcher";
 
@@ -53,6 +54,7 @@ export function ChannelList({ onSelectChannel, onCreateChannel, serverId, curren
   const userThreadsUnread = useThreadsStore((s) => s.userThreadsUnread);
   const reactionsUnread = useReactionsStore((s) => s.unreadCount);
   const draftsCount = useDraftsStore((s) => Object.keys(s.drafts).length);
+  const unreadFilterIncludesMutedDms = useSettingsStore((s) => s.unreadFilterIncludesMutedDms);
 
   const [contextMenu, setContextMenu] = useState<{
     channelId: string;
@@ -166,10 +168,27 @@ export function ChannelList({ onSelectChannel, onCreateChannel, serverId, curren
     return channel.mention_count > 0;
   }
 
-  function isUnread(channel: ChannelInfo): boolean {
-    if (isMuted(channel)) return false;
+  function hasUnreadMessages(channel: ChannelInfo): boolean {
     // Has unread messages (total > seen) OR has explicit @mentions
     return channel.total_msg_count > channel.msg_count || channel.mention_count > 0;
+  }
+
+  function isUnread(channel: ChannelInfo): boolean {
+    if (isMuted(channel)) return false;
+    return hasUnreadMessages(channel);
+  }
+
+  /**
+   * Membership in the unread filter. Wider than isUnread: a muted DM or group
+   * chat still stays quiet in the list (no bold, no badge) but is reachable
+   * through the filter, because a person writing directly is not the same as
+   * traffic in a muted channel.
+   */
+  function matchesUnreadFilter(channel: ChannelInfo): boolean {
+    if (isUnread(channel)) return true;
+    if (!unreadFilterIncludesMutedDms) return false;
+    const isDirect = channel.channel_type === "D" || channel.channel_type === "G";
+    return isDirect && isMuted(channel) && hasUnreadMessages(channel);
   }
 
   function handleThreadsClick() {
@@ -690,10 +709,15 @@ export function ChannelList({ onSelectChannel, onCreateChannel, serverId, curren
                 .map((id) => channelMap.get(id))
                 .filter((ch): ch is ChannelInfo => ch !== undefined);
               const catChannels = cat.category_type === "direct_messages"
-                ? [...allCatChannels].sort((a, b) => b.last_post_at - a.last_post_at).slice(0, dmLimit)
+                ? (() => {
+                    const sorted = [...allCatChannels].sort((a, b) => b.last_post_at - a.last_post_at);
+                    // The dmLimit cut is skipped while filtering, so an unread
+                    // DM below the limit is still reachable.
+                    return filterUnread ? sorted : sorted.slice(0, dmLimit);
+                  })()
                 : allCatChannels;
               const visibleCatChannels = filterUnread
-                ? catChannels.filter((ch) => isUnread(ch))
+                ? catChannels.filter((ch) => matchesUnreadFilter(ch))
                 : catChannels;
 
               const isCollapsed = collapsedCategories.has(cat.id);
@@ -767,11 +791,13 @@ export function ChannelList({ onSelectChannel, onCreateChannel, serverId, curren
         // Fallback static grouping
         <>
           {(() => {
-            const filteredFavorites = filterUnread ? favoriteList.filter(isUnread) : favoriteList;
-            const filteredPublic = filterUnread ? publicChannels.filter(isUnread) : publicChannels;
-            const filteredPrivate = filterUnread ? privateChannels.filter(isUnread) : privateChannels;
+            const filteredFavorites = filterUnread ? favoriteList.filter(matchesUnreadFilter) : favoriteList;
+            const filteredPublic = filterUnread ? publicChannels.filter(matchesUnreadFilter) : publicChannels;
+            const filteredPrivate = filterUnread ? privateChannels.filter(matchesUnreadFilter) : privateChannels;
+            // While filtering, the dmLimit cut is skipped on purpose: an unread
+            // DM must be reachable even when it sits below the visible limit.
             const filteredDm = filterUnread
-              ? dmChannels.slice(0, dmLimit).filter(isUnread)
+              ? dmChannels.filter(matchesUnreadFilter)
               : dmChannels.slice(0, dmLimit);
             return (
               <>
