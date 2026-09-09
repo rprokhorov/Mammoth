@@ -26,6 +26,7 @@ import { SearchBar } from "@/components/search/SearchBar";
 import { TabBar } from "@/components/layout/TabBar";
 import { ChannelInfoPanel } from "@/components/channel/ChannelInfoPanel";
 import { mergeChannelsPreservingActive } from "@/utils/resyncChannels";
+import { resolveInitialChannel, setLastChannelId } from "@/utils/lastChannel";
 // Lazy-load heavy modals
 const ProfileModal = lazy(() => import("@/components/user/ProfileModal").then(m => ({ default: m.ProfileModal })));
 const SettingsModal = lazy(() => import("@/components/user/SettingsModal").then(m => ({ default: m.SettingsModal })));
@@ -156,6 +157,15 @@ function AppContent() {
     loadServers();
   }, []);
 
+  // Remember the open channel so a restart reopens it instead of defaulting to
+  // the first public channel. Tracking the store value rather than the click
+  // handler also covers tab switches and notification navigation.
+  useEffect(() => {
+    if (activeServerId && activeTeamId && activeChannelId) {
+      setLastChannelId(activeServerId, activeTeamId, activeChannelId);
+    }
+  }, [activeServerId, activeTeamId, activeChannelId]);
+
   // Phase 2: listen for channels-loaded event pushed from Rust background task
   useEffect(() => {
     type ChannelsPayload = {
@@ -184,12 +194,17 @@ function AppContent() {
       if (sidebar_categories.length > 0) {
         store.setSidebarCategories(sidebar_categories);
       }
-      // Select first public channel if none is selected yet
+      // Select a channel if none is selected yet: the one open at last exit,
+      // falling back to the first public channel.
       if (!store.activeChannelId) {
-        const firstPublic = channels.find((ch) => ch.channel_type === "O");
-        if (firstPublic) {
-          store.setActiveChannelId(firstPublic.id);
-          useTabsStore.getState().navigateDefaultTab(firstPublic.id);
+        const initial = resolveInitialChannel(
+          channels,
+          event.payload.server_id,
+          event.payload.team_id,
+        );
+        if (initial) {
+          store.setActiveChannelId(initial.id);
+          useTabsStore.getState().navigateDefaultTab(initial.id);
         }
       }
     });
@@ -414,10 +429,14 @@ function AppContent() {
         if (cached_sidebar_categories.length > 0) {
           store.setSidebarCategories(cached_sidebar_categories);
         }
-        const firstPublic = cached_channels.find((ch) => ch.channel_type === "O");
-        if (firstPublic) {
-          store.setActiveChannelId(firstPublic.id);
-          useTabsStore.getState().navigateDefaultTab(firstPublic.id);
+        const initial = resolveInitialChannel(
+          cached_channels,
+          targetId,
+          teams[0]?.id ?? null,
+        );
+        if (initial) {
+          store.setActiveChannelId(initial.id);
+          useTabsStore.getState().navigateDefaultTab(initial.id);
         }
       }
 
@@ -655,11 +674,11 @@ function AppContent() {
         // sidebar categories not critical
       }
 
-      // Select first public channel by default and set it as the default tab
-      const firstPublic = channelData.find((ch) => ch.channel_type === "O");
-      if (firstPublic) {
-        store.setActiveChannelId(firstPublic.id);
-        useTabsStore.getState().navigateDefaultTab(firstPublic.id);
+      // Restore the channel open at last exit, else the first public channel.
+      const initial = resolveInitialChannel(channelData, serverId, teamId);
+      if (initial) {
+        store.setActiveChannelId(initial.id);
+        useTabsStore.getState().navigateDefaultTab(initial.id);
       }
     } catch (e) {
       console.error("Failed to load channels:", e);
