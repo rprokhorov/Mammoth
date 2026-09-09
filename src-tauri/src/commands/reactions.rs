@@ -324,7 +324,7 @@ pub async fn get_reactions_on_my_posts(
     }
 
     // Sort by create_at descending (most recent first)
-    results.sort_by(|a, b| b.create_at.cmp(&a.create_at));
+    results.sort_by_key(|r| std::cmp::Reverse(r.create_at));
 
     Ok(results)
 }
