@@ -12,6 +12,7 @@ import { UserPopover } from "@/components/user/UserPopover";
 import { ReactionsBar } from "./ReactionsBar";
 import { EmojiPicker } from "./EmojiPicker";
 import { MessageAttachments, type MessageAttachment } from "./MessageAttachments";
+import { isHiddenSystemPost } from "@/utils/postVisibility";
 
 interface MessageItemProps {
   post: PostData;
@@ -86,7 +87,7 @@ export const MessageItem = memo(function MessageItem({
   })();
   const reactions = post.metadata?.reactions || [];
 
-  if (post.post_type === "system_join_channel" || post.post_type === "system_leave_channel" || post.post_type === "system_add_to_channel" || post.post_type === "system_remove_from_channel" || post.post_type === "system_join_team" || post.post_type === "system_leave_team" || post.post_type === "system_add_to_team" || post.post_type === "system_remove_from_team") {
+  if (isHiddenSystemPost(post)) {
     return null;
   }
 

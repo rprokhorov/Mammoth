@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { useMessagesStore, type PostData } from "@/stores/messagesStore";
 import { useUiStore } from "@/stores/uiStore";
 import { fetchThreadParticipants } from "@/utils/threadParticipants";
+import { isRenderablePost } from "@/utils/postVisibility";
 import {
   primeLastViewedSnapshot,
   getLastViewedSnapshot,
@@ -162,8 +163,9 @@ export function MessageList({
         const displayOrder = [...res.order].reverse();
         for (const pid of displayOrder) {
           const p = res.posts[pid];
-          if (!p || p.delete_at > 0 || p.root_id) continue;
-          if (p.post_type && p.post_type.startsWith("system_")) continue;
+          // Same visibility rule as the render loop, so the banner can never
+          // point at a post that is not on screen.
+          if (!isRenderablePost(p)) continue;
           if (p.create_at > lastViewedAt) {
             if (!firstUnreadId) firstUnreadId = pid;
             unreadCount++;
@@ -480,10 +482,11 @@ export function MessageList({
     let lastUserId = "";
     let lastTime = 0;
 
-for (const postId of displayOrder) {
+    for (const postId of displayOrder) {
       const post = posts[postId];
-      if (!post || post.delete_at > 0) continue;
-      if (post.root_id) continue;
+      // Must run before the date separator is pushed, otherwise a day holding
+      // only hidden posts renders as a bare date header.
+      if (!isRenderablePost(post)) continue;
 
       const date = new Date(post.create_at);
       const dateKey = date.toLocaleDateString([], {
