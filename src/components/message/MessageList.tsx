@@ -527,7 +527,7 @@ export function MessageList({
       lastTime = post.create_at;
     }
     return result;
-  }, [order, posts, onEditPost, currentUserId, serverId]);
+  }, [order, posts, onEditPost, currentUserId, serverId, handleDelete, handleImageLoad]);
 
   if (loading && order.length === 0) {
     return (
