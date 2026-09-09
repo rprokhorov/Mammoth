@@ -5,6 +5,11 @@ on:
     branches: [main]
     tags: ["v*"]
 
+# Uploading bundles into a release is a write to repository contents; the
+# default read-only GITHUB_TOKEN fails with "Resource not accessible".
+permissions:
+  contents: write
+
 jobs:
   build:
     strategy:
