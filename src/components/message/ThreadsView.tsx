@@ -4,6 +4,7 @@ import { useThreadsStore, type UserThread } from "@/stores/threadsStore";
 import { useUiStore } from "@/stores/uiStore";
 import { useTabsStore } from "@/stores/tabsStore";
 import { primeLastViewedSnapshot } from "@/stores/lastViewedSnapshot";
+import { UserAvatar } from "@/components/common/UserAvatar";
 
 interface UserThreadListResponse {
   threads: UserThread[];
@@ -39,16 +40,49 @@ export function ThreadsView({ serverId, teamId, currentUserId }: ThreadsViewProp
         page: 0,
         perPage: 50,
       });
+      const threads = res.threads ?? [];
       useThreadsStore.getState().setUserThreads(
-        res.threads ?? [],
+        threads,
         res.total,
         res.total_unread_threads,
       );
+      fetchMissingAuthors(threads);
     } catch (e) {
       console.error("Failed to load threads:", e);
     } finally {
       setLoading(false);
     }
+  }
+
+  /**
+   * Thread roots come from get_user_threads, which does not embed author
+   * profiles. Without this the list falls back to a truncated user id and a
+   * placeholder avatar (same gap as the ThreadPanel fix).
+   */
+  function fetchMissingAuthors(threads: UserThread[]) {
+    const cached = useUiStore.getState().users;
+    const missing = [
+      ...new Set(
+        threads
+          .map((t) => t.post?.user_id)
+          .filter((id): id is string => !!id && !cached[id]),
+      ),
+    ];
+    if (missing.length === 0) return;
+    invoke("get_users_by_ids", { serverId, userIds: missing })
+      .then((result) => {
+        useUiStore.getState().setUsers(
+          result as Array<{
+            id: string;
+            username: string;
+            first_name: string;
+            last_name: string;
+            nickname: string;
+            email: string;
+          }>,
+        );
+      })
+      .catch(() => {/* non-critical: the list still shows initials */});
   }
 
   function handleOpenThread(threadId: string) {
@@ -59,7 +93,9 @@ export function ThreadsView({ serverId, teamId, currentUserId }: ThreadsViewProp
     ? userThreads.filter((t) => t.unread_replies > 0)
     : userThreads;
 
-  const users = useUiStore.getState().users;
+  // Subscribed, not a one-off getState read: authors are fetched below after
+  // the threads land, and the list must re-render once they arrive.
+  const users = useUiStore((s) => s.users);
 
   function getChannelLabel(channelId: string): string | null {
     const store = useUiStore.getState();
@@ -148,9 +184,12 @@ export function ThreadsView({ serverId, teamId, currentUserId }: ThreadsViewProp
                 className={`thread-list-item ${isUnread ? "unread" : ""}`}
                 onClick={() => handleOpenThread(thread.id)}
               >
-                <div className="thread-list-avatar">
-                  {authorName.charAt(0).toUpperCase()}
-                </div>
+                <UserAvatar
+                  userId={post.user_id}
+                  username={authorName}
+                  size={32}
+                  className="thread-list-avatar"
+                />
                 <div className="thread-list-content">
                   <div className="thread-list-header">
                     <div className="thread-list-author-row">
