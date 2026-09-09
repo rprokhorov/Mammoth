@@ -7,7 +7,7 @@ import {
 } from "@tauri-apps/plugin-notification";
 import { useUiStore } from "@/stores/uiStore";
 import { useMessagesStore, type PostData } from "@/stores/messagesStore";
-import { useThreadsStore } from "@/stores/threadsStore";
+import { useThreadsStore, type UserThread } from "@/stores/threadsStore";
 import { useTabsStore } from "@/stores/tabsStore";
 import { useReactionsStore } from "@/stores/reactionsStore";
 import { useDraftsStore } from "@/stores/draftsStore";
@@ -41,6 +41,39 @@ let notifPermission: boolean | null = null;
   notifPermission = false;
 });
 
+/// Re-pull channel + thread unread state from the server.
+///
+/// `load_channels_data` fetches channels together with their channel members
+/// (the authoritative msg_count / mention_count) and pushes the result back via
+/// the "channels-loaded" event, which App.tsx already applies to the store.
+function resyncUnreads() {
+  const { activeServerId, activeTeamId } = useUiStore.getState();
+  if (!activeServerId || !activeTeamId) return;
+
+  invoke("load_channels_data", {
+    serverId: activeServerId,
+    teamId: activeTeamId,
+  }).catch(() => {});
+
+  // Threads carry their own unread counters, missed the same way.
+  invoke<{
+    threads: UserThread[];
+    total: number;
+    total_unread_threads: number;
+  }>("get_user_threads", {
+    serverId: activeServerId,
+    teamId: activeTeamId,
+    page: 0,
+    perPage: 50,
+  })
+    .then((res) => {
+      useThreadsStore
+        .getState()
+        .setUserThreads(res.threads ?? [], res.total, res.total_unread_threads);
+    })
+    .catch(() => {});
+}
+
 export function useWebSocket() {
   const activeServerId = useUiStore((s) => s.activeServerId);
 
@@ -59,6 +92,12 @@ export function useWebSocket() {
       if (now - lastReconnect < 5000) return;
       lastReconnect = now;
       invoke("connect_ws", { serverId }).catch(() => {});
+      // Reconnecting only restores the live feed from this moment on: Mattermost
+      // does not replay events missed while the socket was down. Unread state is
+      // otherwise driven purely by `posted` events, so anything that arrived
+      // while the machine was asleep would stay invisible until the user
+      // switched channels. Re-pull the authoritative counts from the server.
+      resyncUnreads();
     };
 
     const onVisibility = () => {
@@ -79,8 +118,16 @@ export function useWebSocket() {
   useEffect(() => {
     const unlistenStatus = listen<WsStatusPayload>("ws_status", (event) => {
       const currentServerId = useUiStore.getState().activeServerId;
-      if (event.payload.server_id === currentServerId) {
-        useUiStore.getState().setWsStatus(event.payload.status);
+      if (event.payload.server_id !== currentServerId) return;
+
+      const prevStatus = useUiStore.getState().wsStatus;
+      useUiStore.getState().setWsStatus(event.payload.status);
+
+      // The backend reconnects on its own (idle timeout, network blip) without
+      // any focus event to piggyback on. Every such gap can hide messages, so
+      // resync whenever the socket comes back up after being down.
+      if (event.payload.status === "connected" && prevStatus !== "connected") {
+        resyncUnreads();
       }
     });
 

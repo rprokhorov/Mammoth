@@ -25,7 +25,7 @@ import { useCustomEmojiStore, type CustomEmoji } from "@/stores/customEmojiStore
 import { SearchBar } from "@/components/search/SearchBar";
 import { TabBar } from "@/components/layout/TabBar";
 import { ChannelInfoPanel } from "@/components/channel/ChannelInfoPanel";
-
+import { mergeChannelsPreservingActive } from "@/utils/resyncChannels";
 // Lazy-load heavy modals
 const ProfileModal = lazy(() => import("@/components/user/ProfileModal").then(m => ({ default: m.ProfileModal })));
 const SettingsModal = lazy(() => import("@/components/user/SettingsModal").then(m => ({ default: m.SettingsModal })));
@@ -174,7 +174,11 @@ function AppContent() {
     const unlisten = listen<ChannelsPayload>("channels-loaded", (event) => {
       const { channels, sidebar_categories, favorite_channel_ids, dm_users } = event.payload;
       const store = useUiStore.getState();
-      store.setChannels(channels);
+      // This event also fires on resync (wake/reconnect), while a channel is
+      // open — keep the active channel's locally cleared unread state.
+      store.setChannels(
+        mergeChannelsPreservingActive(channels, store.channels, store.activeChannelId),
+      );
       store.setUsers(dm_users);
       store.setFavoriteChannels(favorite_channel_ids);
       if (sidebar_categories.length > 0) {
