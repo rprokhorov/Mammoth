@@ -467,8 +467,65 @@ export const EMOJI_MAP: Record<string, string> = {
   unlock: "🔓", key: "🔑", label: "🏷️", bookmark: "🔖",
 };
 
+// Skin-tone modifiers, keyed by the suffix Mattermost appends to a base name
+// (e.g. ok_hand_medium_light_skin_tone -> ok_hand + U+1F3FC).
+const SKIN_TONE_MODIFIERS: Record<string, string> = {
+  light_skin_tone: "\u{1F3FB}",
+  medium_light_skin_tone: "\u{1F3FC}",
+  medium_skin_tone: "\u{1F3FD}",
+  medium_dark_skin_tone: "\u{1F3FE}",
+  dark_skin_tone: "\u{1F3FF}",
+};
+
+const EMOJI_MODIFIER_BASE = /\p{Emoji_Modifier_Base}/u;
+
+// Longest suffix first, so `_medium_light_skin_tone` is not mis-parsed as the
+// `_light_skin_tone` variant of a `..._medium` base.
+const SKIN_TONE_SUFFIXES = Object.keys(SKIN_TONE_MODIFIERS).sort(
+  (a, b) => b.length - a.length,
+);
+
+// Applies a skin-tone modifier to the single modifier-base codepoint of an
+// emoji. The modifier must directly follow the base, replacing any U+FE0F
+// variation selector after it (VS16 and a tone modifier are mutually
+// exclusive in a valid sequence), while keeping ZWJ parts intact —
+// health_worker 🧑‍⚕️ becomes 🧑🏼‍⚕️, not 🧑‍⚕️🏼.
+function applySkinTone(emoji: string, modifier: string): string | null {
+  const codepoints = [...emoji];
+  const baseCount = codepoints.filter((c) => EMOJI_MODIFIER_BASE.test(c)).length;
+  // Only single-person emoji take one tone; multi-person ones (e.g. family)
+  // need a per-person tone that Mattermost does not express with this suffix.
+  if (baseCount !== 1) return null;
+
+  const out: string[] = [];
+  for (let i = 0; i < codepoints.length; i++) {
+    const cp = codepoints[i];
+    out.push(cp);
+    if (EMOJI_MODIFIER_BASE.test(cp)) {
+      if (codepoints[i + 1] === "\u{FE0F}") i++;
+      out.push(modifier);
+    }
+  }
+  return out.join("");
+}
+
 export function emojiNameToUnicode(name: string): string {
-  return EMOJI_MAP[name] || `:${name}:`;
+  const direct = EMOJI_MAP[name];
+  if (direct) return direct;
+
+  // Mattermost sends skin-tone variants as `<base>_<tone>_skin_tone`, which are
+  // not stored in EMOJI_MAP — derive them from the base emoji instead. Suffixes
+  // are tried longest-first, since the shorter ones are suffixes of the longer
+  // ones (`_light_skin_tone` also ends `_medium_light_skin_tone`).
+  for (const suffix of SKIN_TONE_SUFFIXES) {
+    if (!name.endsWith(`_${suffix}`)) continue;
+    const base = EMOJI_MAP[name.slice(0, -(suffix.length + 1))];
+    if (!base) continue;
+    const toned = applySkinTone(base, SKIN_TONE_MODIFIERS[suffix]);
+    if (toned) return toned;
+  }
+
+  return `:${name}:`;
 }
 
 const CustomEmojiBtn = memo(function CustomEmojiBtn({
