@@ -64,6 +64,13 @@ describe("lastChannel", () => {
 });
 
 describe("lastChannel with unavailable storage", () => {
+  // Storage must be cleared here too, not just in the block above: these tests
+  // fake a blocked Storage, and anything a previous test left behind would be
+  // read back as a remembered channel.
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
   afterEach(() => {
     vi.restoreAllMocks();
   });
