@@ -24,10 +24,15 @@ vi.mock("@tauri-apps/plugin-notification", () => ({
   requestPermission: vi.fn(() => Promise.resolve("granted")),
 }));
 
-// jsdom here runs without a working localStorage (node is started without
-// --localstorage-file), so code that persists state has nothing to write to.
-// Provide an in-memory implementation with the real Storage semantics.
-if (typeof globalThis.localStorage === "undefined") {
+// Always install our own localStorage, even when the environment already
+// provides one. Depending on the Node version, jsdom either exposes no
+// localStorage at all (node started without --localstorage-file) or a native
+// one whose methods cannot be intercepted by vi.spyOn, because they live
+// behind an internal proxy rather than on the prototype. Tests that fake
+// blocked storage would then silently write for real and leak state into the
+// next test — a failure that only reproduced on CI. One implementation
+// everywhere keeps spying, and therefore the suite, version-independent.
+{
   class MemoryStorage implements Storage {
     private store = new Map<string, string>();
     get length() {
