@@ -26,6 +26,12 @@ interface ThreadsState {
   userThreads: UserThread[];
   userThreadsTotal: number;
   userThreadsUnread: number;
+  // Thread ids that bumped `userThreadsUnread` while NOT present in
+  // `userThreads` (unread reply arrived for a thread we haven't loaded yet).
+  // Tracked explicitly so `markThreadRead` only decrements the global counter
+  // for a thread that actually contributed to it — never for an arbitrary,
+  // never-unread thread.
+  orphanedUnreadThreadIds: string[];
   // Loading
   threadLoading: boolean;
   // Post to scroll to + highlight inside the open thread
@@ -54,6 +60,7 @@ export const useThreadsStore = create<ThreadsState>((set) => ({
   userThreads: [],
   userThreadsTotal: 0,
   userThreadsUnread: 0,
+  orphanedUnreadThreadIds: [],
   threadLoading: false,
   scrollToThreadPostId: null,
 
@@ -103,7 +110,14 @@ export const useThreadsStore = create<ThreadsState>((set) => ({
     }),
 
   setUserThreads: (threads, total, unread) =>
-    set({ userThreads: threads, userThreadsTotal: total, userThreadsUnread: unread }),
+    // A server refresh is authoritative for the unread count, so any locally
+    // tracked orphaned bumps are now subsumed and must be discarded.
+    set({
+      userThreads: threads,
+      userThreadsTotal: total,
+      userThreadsUnread: unread,
+      orphanedUnreadThreadIds: [],
+    }),
 
   setThreadLoading: (loading) => set({ threadLoading: loading }),
 
@@ -112,23 +126,25 @@ export const useThreadsStore = create<ThreadsState>((set) => ({
   markThreadRead: (threadId) =>
     set((state) => {
       const thread = state.userThreads.find((t) => t.id === threadId);
-      // Thread is unread if it's in the list with unread_replies > 0,
-      // OR if it's not in the list at all (was incremented via incrementThreadUnread for unknown thread)
-      const wasUnread = thread ? thread.unread_replies > 0 : false;
-      // If thread not in list, we may have bumped the global counter anyway — check via a marker
-      // We track this by checking if userThreadsUnread > count of unread threads in list
-      const knownUnreadCount = state.userThreads.filter((t) => t.unread_replies > 0).length;
-      const hasOrphanedCount = state.userThreadsUnread > knownUnreadCount;
-      const shouldDecrement = wasUnread || (!thread && hasOrphanedCount);
+      // A thread contributed to `userThreadsUnread` if it's in the list with
+      // unread_replies > 0, OR it was tracked as an orphaned unread thread
+      // (incrementThreadUnread bumped the counter for a not-yet-loaded thread).
+      // Only such a thread may decrement the counter — never an arbitrary,
+      // never-unread thread.
+      const isOrphanedUnread = state.orphanedUnreadThreadIds.includes(threadId);
+      const wasUnread = thread ? thread.unread_replies > 0 : isOrphanedUnread;
       return {
         userThreads: state.userThreads.map((t) =>
           t.id === threadId
             ? { ...t, unread_replies: 0, unread_mentions: 0, last_viewed_at: Date.now() }
             : t,
         ),
-        userThreadsUnread: shouldDecrement
+        userThreadsUnread: wasUnread
           ? Math.max(0, state.userThreadsUnread - 1)
           : state.userThreadsUnread,
+        orphanedUnreadThreadIds: isOrphanedUnread
+          ? state.orphanedUnreadThreadIds.filter((id) => id !== threadId)
+          : state.orphanedUnreadThreadIds,
       };
     }),
 
@@ -161,9 +177,15 @@ export const useThreadsStore = create<ThreadsState>((set) => ({
     set((state) => {
       const thread = state.userThreads.find((t) => t.id === threadId);
       if (!thread) {
-        // Thread not in local list yet — still bump the global unread counter
+        // Thread not in local list yet — bump the global counter, but only
+        // once per not-yet-loaded thread, and remember it so markThreadRead
+        // can decrement it back later without touching unrelated threads.
+        if (state.orphanedUnreadThreadIds.includes(threadId)) {
+          return state;
+        }
         return {
           userThreadsUnread: state.userThreadsUnread + 1,
+          orphanedUnreadThreadIds: [...state.orphanedUnreadThreadIds, threadId],
         };
       }
       const wasRead = thread.unread_replies === 0;

@@ -36,11 +36,11 @@ Two-part effort. First, a focused bug-hunting pass over the frontend stores/hook
 - Modify (fixes as confirmed): `src/stores/threadsStore.ts`, `src/App.tsx`, and any store where a bug is confirmed
 - Create: `src/test/bugfixes.test.ts` (regression tests, one `describe` per confirmed bug)
 
-- [ ] Audit `threadsStore.markThreadRead` / `incrementThreadUnread` for over/under-decrement of `userThreadsUnread`; write a failing test reproducing the drift, then fix
-- [ ] Audit `App.tsx` cold-start notification path (`notif:navigate-channel`, `check_pending_notification`) for selecting a channel before `channels` are loaded; add a guard/retry and a regression test
-- [ ] Audit `tabsStore.incrementTabUnread` and `uiStore.incrementChannelUnread`/`clearChannelUnread` for off-by-one / active-channel edge cases; add tests, fix if confirmed
-- [ ] For any suspected issue that turns out correct, add a characterization test instead and note it in the test file
-- [ ] run `npm run test` — must pass before Task 2
+- [x] Audit `threadsStore.markThreadRead` / `incrementThreadUnread` for over/under-decrement of `userThreadsUnread`; write a failing test reproducing the drift, then fix — CONFIRMED BUG: the `hasOrphanedCount` heuristic (`userThreadsUnread > knownUnreadCount`) decremented the global counter when marking ANY not-in-list, never-unread thread read, whenever the server's unread total exceeded the count of unread threads on the loaded page. Fixed by tracking orphaned unread thread ids explicitly (`orphanedUnreadThreadIds`) so only threads that actually contributed to the counter decrement it; `setUserThreads` resets the set (server is authoritative), `incrementThreadUnread` records/dedups orphans. Regression tests in `bugfixes.test.ts`
+- [x] Audit `App.tsx` cold-start notification path (`notif:navigate-channel`, `check_pending_notification`) for selecting a channel before `channels` are loaded; add a guard/retry and a regression test — CONFIRMED BUG: `handleSelectChannel` set a stale `activeChannelId` for a not-yet-loaded channel, skipping last-viewed priming and suppressing the `channels-loaded` auto-select fallback. Fixed with `src/stores/pendingChannelSelection.ts` guard: not-yet-loaded selections are deferred and re-applied by the `channels-loaded` handler. Regression tests in `bugfixes.test.ts`
+- [x] Audit `tabsStore.incrementTabUnread` and `uiStore.incrementChannelUnread`/`clearChannelUnread` for off-by-one / active-channel edge cases; add tests, fix if confirmed — audited, behavior CORRECT (no code change); characterization tests added
+- [x] For any suspected issue that turns out correct, add a characterization test instead and note it in the test file — `tabsStore.incrementTabUnread` and `uiStore` channel unread math locked in with characterization tests marked "no bug"
+- [x] run `npm run test` — must pass before Task 2 — 96 tests pass (7 files)
 
 ### Task 2: `useWebSocket` event-handler tests (largest untested surface)
 
@@ -48,12 +48,12 @@ Two-part effort. First, a focused bug-hunting pass over the frontend stores/hook
 - Create: `src/test/useWebSocket.test.ts`
 - Modify: `src/hooks/useWebSocket.ts` (only if a handler bug is confirmed)
 
-- [ ] Test `handlePosted`: top-level post adds to channel order; thread reply increments root `reply_count` and routes to open thread vs. followed-thread unread; system messages skip unread/notify
-- [ ] Test `isMentioned` / `shouldNotify` matrix: muted channel, `desktop: none/mention/all/default`, `@username`, `@channel/@all/@here`, no current user
-- [ ] Test reactions (`handleReactionAdded`/`Removed`): dedup, only-notify-on-my-post, reaction chip updates on post + thread copy
-- [ ] Test `handleChannelViewed` / `handleMultipleChannelsViewed`, `handleTyping` (5s timeout via fake timers), `handleDraftUpserted`/`Deleted` newer-wins, `handleOpenDialog` nested-unwrap
-- [ ] Fix any confirmed handler bug found while testing
-- [ ] run `npm run test` — must pass before Task 3
+- [x] Test `handlePosted`: top-level post adds to channel order; thread reply increments root `reply_count` and routes to open thread vs. followed-thread unread; system messages skip unread/notify — covered in `src/test/useWebSocket.test.ts` (top-level order/badge/tab, thread-reply routing + followed vs unfollowed unread, system-message skip of unread/tab/notify)
+- [x] Test `isMentioned` / `shouldNotify` matrix: muted channel, `desktop: none/mention/all/default`, `@username`, `@channel/@all/@here`, no current user — full matrix exercised via the desktop-notification `show_notification` invoke (default/all notify all; none & muted suppress; mention gates on `@username`/`@channel`/`@all`/`@here`; no-current-user suppressed; empty-username @me not a mention)
+- [x] Test reactions (`handleReactionAdded`/`Removed`): dedup, only-notify-on-my-post, reaction chip updates on post + thread copy — chip add/remove on post and thread copy, dedup of identical user+emoji, notify only when someone else reacts to MY post, unknown-post no-op
+- [x] Test `handleChannelViewed` / `handleMultipleChannelsViewed`, `handleTyping` (5s timeout via fake timers), `handleDraftUpserted`/`Deleted` newer-wins, `handleOpenDialog` nested-unwrap — plus `channel_member_updated` notify-props sync and `post_edited`/`post_deleted`; typing uses fake timers for the 5s expiry + timer reset
+- [x] Fix any confirmed handler bug found while testing — none found; all handlers behave correctly, so `useWebSocket.ts` is unchanged (tests are characterization coverage)
+- [x] run `npm run test` — must pass before Task 3 — 151 tests pass (8 files); new `useWebSocket.test.ts` adds 55
 
 ### Task 3: Remaining store coverage (drafts, reactions, tabs, ui, threads)
 

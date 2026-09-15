@@ -5,6 +5,11 @@ import type { InteractiveDialog } from "@/components/message/InteractiveDialogMo
 import { useUiStore, type SidebarCategory } from "@/stores/uiStore";
 import { useMessagesStore } from "@/stores/messagesStore";
 import { primeLastViewedSnapshot } from "@/stores/lastViewedSnapshot";
+import {
+  resolveChannelSelection,
+  getPendingChannelSelection,
+  clearPendingChannelSelection,
+} from "@/stores/pendingChannelSelection";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { ServerSidebar } from "@/components/layout/ServerSidebar";
 import { ChannelList } from "@/components/layout/ChannelList";
@@ -194,9 +199,15 @@ function AppContent() {
       if (sidebar_categories.length > 0) {
         store.setSidebarCategories(sidebar_categories);
       }
-      // Select a channel if none is selected yet: the one open at last exit,
-      // falling back to the first public channel.
-      if (!store.activeChannelId) {
+      // A notification may have asked us to open a channel before the list
+      // loaded — apply that deferred selection now that the channel exists.
+      // It wins over the remembered channel: the user explicitly clicked it.
+      const pending = getPendingChannelSelection();
+      if (pending && channels.some((ch) => ch.id === pending)) {
+        handleSelectChannel(pending);
+      } else if (!store.activeChannelId) {
+        // Otherwise the one open at last exit, falling back to the first
+        // public channel.
         const initial = resolveInitialChannel(
           channels,
           event.payload.server_id,
@@ -722,6 +733,13 @@ function AppContent() {
 
   function handleSelectChannel(channelId: string) {
     const store = useUiStore.getState();
+    // Guard against notification/cold-start navigation that fires before the
+    // channel list has loaded. Selecting a not-yet-loaded channel would set a
+    // stale activeChannelId, skip last-viewed priming, and suppress the
+    // auto-select fallback. Defer it instead and let `channels-loaded` retry.
+    if (resolveChannelSelection(channelId, store.channels) === "deferred") {
+      return;
+    }
     // Snapshot the channel's last_viewed_at BEFORE any view/read side effect.
     // This frozen value drives the "first unread" scroll anchor in MessageList.
     // Matches Mattermost webapp's `views.channel.lastChannelViewTime` behavior.
@@ -729,6 +747,7 @@ function AppContent() {
     if (ch) {
       primeLastViewedSnapshot(channelId, ch.last_viewed_at);
     }
+    clearPendingChannelSelection();
     store.setActiveChannelId(channelId);
     store.setMainSubView("channels");
     // Navigate default tab to this channel (don't create a new tab)

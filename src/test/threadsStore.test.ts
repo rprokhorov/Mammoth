@@ -46,6 +46,7 @@ const initialState = {
   userThreads: [],
   userThreadsTotal: 0,
   userThreadsUnread: 0,
+  orphanedUnreadThreadIds: [],
   threadLoading: false,
   scrollToThreadPostId: null,
 };
@@ -128,14 +129,26 @@ describe("threadsStore", () => {
       expect(useThreadsStore.getState().userThreadsUnread).toBe(0);
     });
 
-    it("handles thread not in list but with orphaned count", () => {
-      // Thread not in list, global counter is 1 (orphaned)
-      useThreadsStore.setState({ userThreads: [], userThreadsUnread: 1 });
+    it("decrements the counter for a thread that was orphan-incremented", () => {
+      // incrementThreadUnread bumped the global counter for a not-yet-loaded
+      // thread and recorded it as orphaned. Marking THAT thread read clears it.
+      useThreadsStore.setState({ userThreads: [], userThreadsUnread: 0 });
+      useThreadsStore.getState().incrementThreadUnread("unknown-thread");
+      expect(useThreadsStore.getState().userThreadsUnread).toBe(1);
 
       useThreadsStore.getState().markThreadRead("unknown-thread");
 
-      // Should decrement orphaned counter
       expect(useThreadsStore.getState().userThreadsUnread).toBe(0);
+    });
+
+    it("does not decrement for an unknown thread that was never unread", () => {
+      // Counter is non-zero (e.g. from the server), but the thread being marked
+      // read was never tracked as unread — the counter must be untouched.
+      useThreadsStore.setState({ userThreads: [], userThreadsUnread: 2, orphanedUnreadThreadIds: [] });
+
+      useThreadsStore.getState().markThreadRead("never-unread");
+
+      expect(useThreadsStore.getState().userThreadsUnread).toBe(2);
     });
   });
 
