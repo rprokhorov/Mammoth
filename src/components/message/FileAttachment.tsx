@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { VideoPlayer } from "./VideoPlayer";
 
 interface FileInfo {
   id: string;
@@ -22,6 +23,9 @@ interface FileAttachmentProps {
 }
 
 const IMAGE_EXTENSIONS = ["png", "jpg", "jpeg", "gif", "bmp", "webp", "svg"];
+// Formats the webview can actually decode. Others (avi, wmv, flv) stay generic
+// file rows rather than showing a player that would fail on play.
+const VIDEO_EXTENSIONS = ["mp4", "webm", "ogv", "m4v", "mov"];
 
 // Separate caches for thumbnails and full-size originals
 const thumbnailCache = new Map<string, string>();
@@ -119,12 +123,28 @@ export function FileAttachment({ fileIds, serverId, onImageLoad }: FileAttachmen
     <>
       <div className="file-attachments">
         {files.map((file) => {
-          const isImage = IMAGE_EXTENSIONS.includes(file.extension.toLowerCase());
+          const ext = file.extension.toLowerCase();
+          const isImage = IMAGE_EXTENSIONS.includes(ext);
+          const isVideo =
+            VIDEO_EXTENSIONS.includes(ext) || file.mime_type?.startsWith("video/");
           const thumbUrl = displayUrls[file.id];
 
+          const kind = isImage ? "image" : isVideo ? "video" : "generic";
+
           return (
-            <div key={file.id} className={`file-attachment ${isImage ? "image" : "generic"}`}>
-              {isImage ? (
+            <div key={file.id} className={`file-attachment ${kind}`}>
+              {isVideo ? (
+                <VideoPlayer
+                  fileId={file.id}
+                  serverId={serverId}
+                  fileName={file.name}
+                  fileSize={file.size}
+                  mimeType={file.mime_type}
+                  width={file.width}
+                  height={file.height}
+                  onDownload={() => handleDownload(file.id, file.name)}
+                />
+              ) : isImage ? (
                 (() => {
                   const origW = file.width || 400;
                   const origH = file.height || 200;

@@ -4340,3 +4340,222 @@ select:focus-visible {
   padding: 4px 12px;
   font-size: 12px;
 }
+
+/* ── Video attachments ─────────────────────────────────────────────── */
+
+/* Poster shown before the bytes are fetched: nothing downloads until click. */
+.video-poster {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  overflow: hidden;
+  max-width: 100%;
+}
+
+.video-poster:hover {
+  border-color: var(--accent);
+}
+
+.video-poster-play {
+  font-size: 40px;
+  color: var(--text-primary);
+  opacity: 0.75;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.video-poster:hover .video-poster-play {
+  opacity: 1;
+  color: var(--accent);
+}
+
+.video-poster-meta {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 8px;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.65));
+  pointer-events: none;
+}
+
+.video-poster-name {
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.video-poster-size {
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 11px;
+}
+
+.video-poster-download {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  width: 26px;
+  height: 26px;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+}
+
+.video-poster-download:hover {
+  background: rgba(0, 0, 0, 0.8);
+}
+
+.video-player {
+  position: relative;
+  background: #000;
+  border-radius: 6px;
+  overflow: hidden;
+  max-width: 100%;
+  outline: none;
+}
+
+.video-player:focus-visible {
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+.video-player-media {
+  display: block;
+  width: 100%;
+  max-height: 70vh;
+  background: #000;
+  cursor: pointer;
+}
+
+/* Fullscreen puts the container itself in charge of layout, so the video has
+   to shrink to fit rather than overflow behind the controls. */
+.video-player:fullscreen {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  width: 100% !important;
+  background: #000;
+}
+
+.video-player:fullscreen .video-player-media {
+  max-height: calc(100vh - 44px);
+  flex: 1;
+  min-height: 0;
+  object-fit: contain;
+}
+
+.video-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--border);
+}
+
+.video-btn {
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  padding: 4px 6px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.video-btn:hover {
+  background: var(--bg-tertiary);
+  color: var(--accent);
+}
+
+.video-time {
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+.video-seek {
+  flex: 1;
+  min-width: 40px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.video-volume {
+  width: 64px;
+  flex-shrink: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.video-rate-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.video-rate-btn {
+  font-variant-numeric: tabular-nums;
+  min-width: 34px;
+}
+
+.video-rate-menu {
+  position: absolute;
+  bottom: calc(100% + 4px);
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  z-index: 10;
+  overflow: hidden;
+}
+
+.video-rate-item {
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 5px 14px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.video-rate-item:hover {
+  background: var(--bg-tertiary);
+}
+
+.video-rate-item.active {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.video-player-error {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  background: var(--error);
+  color: #fff;
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 4px;
+}

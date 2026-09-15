@@ -115,6 +115,33 @@ pub async fn get_image_data(
     Ok(ImageDataResult { data_url })
 }
 
+/// Fetches a file's raw bytes for playback in the webview.
+///
+/// Video goes to a Blob rather than a base64 data URL: base64 inflates the
+/// payload by a third and forces the whole clip through the IPC bridge as a
+/// string, which is wasteful for the tens of megabytes a video can weigh.
+/// `tauri::ipc::Response` sends the bytes directly instead.
+#[tauri::command]
+pub async fn get_file_bytes(
+    state: State<'_, AppState>,
+    server_id: String,
+    file_id: String,
+) -> Result<tauri::ipc::Response, AppError> {
+    let client = {
+        let servers = state
+            .servers
+            .lock()
+            .map_err(|e| AppError::Config(e.to_string()))?;
+        let server = servers
+            .get(&server_id)
+            .ok_or_else(|| AppError::NotFound(format!("Server {} not found", server_id)))?;
+        server.client.clone()
+    };
+
+    let bytes = client.download_file(&file_id).await?;
+    Ok(tauri::ipc::Response::new(bytes))
+}
+
 /// Fetches the thumbnail (small preview) of an image file as base64 data URL.
 #[tauri::command]
 pub async fn get_image_thumbnail(
