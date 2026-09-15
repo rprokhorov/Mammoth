@@ -139,7 +139,7 @@ export function useWebSocket() {
 
       switch (eventType) {
         case "posted":
-          handlePosted(data, broadcast);
+          handlePosted(data, broadcast, server_id);
           break;
         case "post_edited":
           handlePostEdited(data);
@@ -248,9 +248,31 @@ function shouldNotify(
   return true;
 }
 
-function handlePosted(
+/**
+ * Clear the unread state of a thread the user currently has open.
+ *
+ * Mirrors what ThreadPanel does when a thread is first opened, but for replies
+ * that arrive while the panel is already on screen. The server call matters as
+ * much as the local one: it moves the thread's last_viewed_at, so the channel
+ * stops being reported as unread by the next `get_channel_member` sync.
+ */
+function markOpenThreadRead(threadId: string, serverId: string) {
+  useThreadsStore.getState().markThreadRead(threadId);
+
+  const teamId = useUiStore.getState().activeTeamId;
+  if (!teamId) return;
+  invoke("mark_thread_as_read", {
+    serverId,
+    teamId,
+    threadId,
+    timestamp: Date.now(),
+  }).catch((e: unknown) => console.error("Failed to mark thread as read:", e));
+}
+
+export function handlePosted(
   data: Record<string, unknown>,
   broadcast: { channel_id: string },
+  serverId: string,
 ) {
   const channelId = broadcast.channel_id;
   if (!channelId) return;
@@ -276,6 +298,11 @@ function handlePosted(
       const { activeThreadId } = useThreadsStore.getState();
       if (activeThreadId === post.root_id) {
         useThreadsStore.getState().addThreadReply(post);
+        // The user is looking at this thread right now, so the reply is already
+        // read. Without this the thread keeps its unread state both locally
+        // (the "unread threads" badge) and on the server, which then re-reports
+        // the channel as unread on the next sync.
+        markOpenThreadRead(post.root_id, serverId);
       } else {
         // Thread is not open — increment unread count only for followed threads
         const { userThreads } = useThreadsStore.getState();
@@ -427,6 +454,26 @@ function handleThreadUpdated(data: Record<string, unknown>) {
   }
 }
 
+export interface ChannelMemberCounts {
+  msg_count: number;
+  msg_count_root: number;
+  mention_count: number;
+}
+
+/**
+ * The number of posts the user has seen, on the same scale as the channel's
+ * `total_msg_count`.
+ *
+ * The backend fills `total_msg_count` from `total_msg_count_root` whenever the
+ * server provides it (Mattermost 6+), i.e. counting root posts only. Comparing
+ * that against the member's plain `msg_count` — which also counts thread
+ * replies — makes a read channel look unread by exactly the number of replies
+ * in it, so the root value has to win here too.
+ */
+export function seenMsgCount(member: ChannelMemberCounts): number {
+  return member.msg_count_root > 0 ? member.msg_count_root : member.msg_count;
+}
+
 function handleChannelViewed(
   data: Record<string, unknown>,
   broadcast: { channel_id: string },
@@ -445,11 +492,13 @@ function handleChannelViewed(
 
   // Sync authoritative msg_count/mention_count from server
   if (activeServerId) {
-    invoke<{ msg_count: number; mention_count: number }>("get_channel_member", {
+    invoke<ChannelMemberCounts>("get_channel_member", {
       serverId: activeServerId,
       channelId,
     }).then((member) => {
-      useUiStore.getState().updateChannelMentions(channelId, member.mention_count, member.msg_count);
+      useUiStore
+        .getState()
+        .updateChannelMentions(channelId, member.mention_count, seenMsgCount(member));
       updateBadgeCount();
     }).catch(() => {});
   }
@@ -470,11 +519,13 @@ function handleMultipleChannelsViewed(data: Record<string, unknown>) {
 
     // Fetch authoritative counts from server
     if (activeServerId) {
-      invoke<{ msg_count: number; mention_count: number }>("get_channel_member", {
+      invoke<ChannelMemberCounts>("get_channel_member", {
         serverId: activeServerId,
         channelId,
       }).then((member) => {
-        useUiStore.getState().updateChannelMentions(channelId, member.mention_count, member.msg_count);
+        useUiStore
+          .getState()
+          .updateChannelMentions(channelId, member.mention_count, seenMsgCount(member));
       }).catch(() => {});
     }
   }

@@ -20,6 +20,7 @@ vi.mock("@tauri-apps/api/window", () => ({
 
 vi.mock("@tauri-apps/plugin-notification", () => ({
   sendNotification: vi.fn(),
+  isPermissionGranted: vi.fn(() => Promise.resolve(true)),
   requestPermission: vi.fn(() => Promise.resolve("granted")),
 }));
 
